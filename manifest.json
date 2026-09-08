@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Markd",
+  "version": "0.1.0",
+  "minimum_chrome_version": "90",
+  "permissions": ["bookmarks"],
+  "action": {
+    "default_title": "Open Markd"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  }
+}
