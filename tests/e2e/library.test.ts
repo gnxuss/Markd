@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-
 import { afterEach, describe, expect, it } from "vitest";
 
 import { launchExtension, type ExtensionFixture, type SeedNode } from "./fixtures.js";
@@ -46,7 +44,7 @@ describe("library-load built Chromium", () => {
     const nestedId = fixture.bookmarks["nested"]?.id;
     const row = await page.waitForSelector(`[data-bookmark-id="${nestedId}"]`);
     expect(await row?.$eval(".bookmark-title", (element) => element.textContent)).toBe("Untitled bookmark");
-    expect(await row?.$eval(".bookmark-url", (element) => element.textContent)).toBe("nested.example/a/very/long/path");
+    expect(await row?.$eval(".bookmark-url", (element) => element.textContent)).toBe("nested.example/a/very/long/…");
     expect(await row?.$eval(".bookmark-tags", (element) => element.textContent)).toBe("");
   }, 30_000);
 });
@@ -78,7 +76,11 @@ describe("empty-library built Chromium", () => {
 
 describe("permission-audit emitted package", () => {
   it("requests exactly the Phase 1 browser authority", async () => {
-    const manifest: unknown = JSON.parse(await readFile(new URL("../../dist/manifest.json", import.meta.url), "utf8"));
+    fixture = await launchExtension([]);
+    const manifest: unknown = await fixture.worker.evaluate(async () => {
+      const response = await fetch(chrome.runtime.getURL("manifest.json"));
+      return response.json();
+    });
     expect(manifest).toEqual({
       manifest_version: 3,
       name: "Markd",
