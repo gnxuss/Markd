@@ -25,6 +25,14 @@ export type ExtensionFixture = {
   readonly openLibrary: () => Promise<Page>;
 };
 
+export type BookmarkGesture = "primary" | "modifier-primary" | "middle";
+
+export type OpenedBookmark = {
+  readonly libraryPage: Page;
+  readonly openedPage: Page;
+  readonly matchingTargetCount: number;
+};
+
 const extensionPath = decodeURIComponent(new URL("../../dist", import.meta.url).pathname);
 
 async function extensionWorker(browser: Browser): Promise<WebWorker> {
@@ -80,4 +88,12 @@ export async function launchExtension(nodes: readonly SeedNode[]): Promise<Exten
       return page;
     },
   };
+}
+
+export async function openSeededBookmark(
+  _fixture: ExtensionFixture,
+  _key: string,
+  _gesture: BookmarkGesture,
+): Promise<OpenedBookmark> {
+  throw new TypeError("Trusted tab observation is not implemented");
 }

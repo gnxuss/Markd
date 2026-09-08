@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { launchExtension, type ExtensionFixture, type SeedNode } from "./fixtures.js";
+import {
+  launchExtension,
+  openSeededBookmark,
+  type BookmarkGesture,
+  type ExtensionFixture,
+  type SeedNode,
+} from "./fixtures.js";
 
 const duplicateUrl = "https://duplicate.example/native";
 const libraryNodes = [
@@ -91,4 +97,23 @@ describe("permission-audit emitted package", () => {
       background: { service_worker: "background.js", type: "module" },
     });
   });
+});
+
+describe("bookmark-open built Chromium", () => {
+  it.each([
+    ["ordinary primary", "primary", "visible"],
+    ["platform modifier primary", "modifier-primary", "hidden"],
+    ["middle", "middle", "hidden"],
+  ] as const)("opens exactly one %s tab with native disposition", async (_name, gesture, visibility) => {
+    const url = `https://${gesture}.example/exact-native-path`;
+    fixture = await launchExtension([
+      { kind: "bookmark", key: "opening-target", title: "Opening target", url },
+    ]);
+    const opened = await openSeededBookmark(fixture, "opening-target", gesture satisfies BookmarkGesture);
+    expect(opened.matchingTargetCount).toBe(1);
+    expect(opened.openedPage.url()).toBe(url);
+    expect(await opened.openedPage.evaluate(() => document.visibilityState)).toBe(visibility);
+    expect(opened.libraryPage.url()).toBe(fixture.libraryUrl);
+    expect(opened.libraryPage.isClosed()).toBe(false);
+  }, 30_000);
 });
