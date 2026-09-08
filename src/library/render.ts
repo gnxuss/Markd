@@ -1,5 +1,6 @@
 import { displayUrl } from "../bookmarks/display-url.js";
-import type { BookmarkRow, LibraryState } from "../types.js";
+import type { BookmarkActivation } from "./controller.js";
+import type { BookmarkRow, LibraryState, RowOpenState } from "../types.js";
 
 export interface RenderElement {
   className: string;
@@ -21,20 +22,44 @@ export type LibraryElements = {
   readonly bookmarks: RenderElement;
 };
 
-export type ActivateBookmark = (event: Event, row: BookmarkRow) => void;
+export type ActivateBookmark = (event: BookmarkActivation, row: BookmarkRow) => void;
+
+function activationFromEvent(event: Event): BookmarkActivation | undefined {
+  if (!(event instanceof MouseEvent)) return undefined;
+  const target = event.target;
+  const currentTarget = event.currentTarget;
+  const nestedInteractive =
+    target instanceof Element &&
+    target !== currentTarget &&
+    target.closest("button,input,select,textarea,[role=button]") !== null;
+  return {
+    button: event.button,
+    ctrlKey: event.ctrlKey,
+    metaKey: event.metaKey,
+    nestedInteractive,
+    preventDefault: () => event.preventDefault(),
+  };
+}
 
 function createBookmarkRow(
   row: BookmarkRow,
+  openState: RowOpenState,
   elements: LibraryElements,
   activate: ActivateBookmark,
 ): RenderElement {
   const item = elements.document.createElement("li");
   item.className = "bookmark-row";
   elements.document.setAttribute(item, "data-bookmark-id", row.id);
+  elements.document.setAttribute(item, "aria-busy", String(openState.kind === "opening"));
   const link = elements.document.createElement("a");
   link.className = "bookmark-link";
   elements.document.setAttribute(link, "href", row.url);
-  elements.document.addEventListener(link, "click", (event) => activate(event, row));
+  const handleActivation = (event: Event): void => {
+    const activation = activationFromEvent(event);
+    if (activation !== undefined) activate(activation, row);
+  };
+  elements.document.addEventListener(link, "click", handleActivation);
+  elements.document.addEventListener(link, "auxclick", handleActivation);
   const title = elements.document.createElement("span");
   title.className = "bookmark-title";
   title.textContent = row.title.length > 0 ? row.title : "Untitled bookmark";
@@ -44,8 +69,15 @@ function createBookmarkRow(
   const tags = elements.document.createElement("span");
   tags.className = "bookmark-tags";
   elements.document.setAttribute(tags, "aria-label", "Tags");
-  elements.document.append(link, [title, url, tags]);
-  elements.document.append(item, [link]);
+  elements.document.append(link, [title]);
+  elements.document.append(item, [link, url, tags]);
+  if (openState.kind === "error") {
+    const error = elements.document.createElement("span");
+    error.className = "bookmark-error";
+    error.textContent = openState.message;
+    elements.document.setAttribute(error, "role", "status");
+    elements.document.append(item, [error]);
+  }
   return item;
 }
 
@@ -72,7 +104,8 @@ export function renderLibrary(
       const list = elements.document.createElement("ul");
       list.className = "bookmark-list";
       for (const row of state.rows) {
-        elements.document.append(list, [createBookmarkRow(row, elements, activate)]);
+        const openState = state.rowStates[row.id] ?? { kind: "idle" };
+        elements.document.append(list, [createBookmarkRow(row, openState, elements, activate)]);
       }
       elements.document.append(elements.bookmarks, [list]);
       return;

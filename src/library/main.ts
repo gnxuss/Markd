@@ -36,6 +36,8 @@ const elements = {
 };
 const controller = createLibraryController({
   loadRows: loadBookmarkRows,
-  render: (state) => renderLibrary(state, elements, () => undefined),
+  render: (state) => renderLibrary(state, elements, (event, row) => {
+    void controller.activate(event, row);
+  }),
 });
 void controller.bootstrap();

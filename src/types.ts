@@ -13,5 +13,9 @@ export type RowOpenState =
 export type LibraryState =
   | { readonly kind: "loading" }
   | { readonly kind: "empty" }
-  | { readonly kind: "ready"; readonly rows: readonly BookmarkRow[] }
+  | {
+      readonly kind: "ready";
+      readonly rows: readonly BookmarkRow[];
+      readonly rowStates: Readonly<Record<string, RowOpenState>>;
+    }
   | { readonly kind: "error"; readonly message: string };

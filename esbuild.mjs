@@ -47,6 +47,7 @@ if (!process.argv.includes("--check")) {
   await Promise.all([
     cp("manifest.json", "dist/manifest.json"),
     cp("src/library/index.html", "dist/library.html"),
+    cp("src/library/styles.css", "dist/library.css"),
   ]);
   await auditManifest("dist/manifest.json");
 }

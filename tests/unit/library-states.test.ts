@@ -85,22 +85,24 @@ describe("library state", () => {
     const status = new FakeElement();
     const bookmarks = new FakeElement();
     renderLibrary(
-      { kind: "ready", rows: [row] },
+      { kind: "ready", rows: [row], rowStates: {} },
       { document: documentPort, status, bookmarks },
       vi.fn(),
     );
     const link = bookmarks.children[0]?.children[0]?.children[0];
     expect(link?.attributes.get("href")).toBe(row.url);
     expect(link?.children[0]?.textContent).toBe(row.title);
-    expect(link?.children[1]?.textContent).toBe("example.com/reference");
-    expect(link?.children[2]?.children).toEqual([]);
+    expect(bookmarks.children[0]?.children[0]?.children[1]?.textContent).toBe(
+      "example.com/reference",
+    );
+    expect(bookmarks.children[0]?.children[0]?.children[2]?.children).toEqual([]);
   });
 
   it("uses an explicit fallback for a blank native title", () => {
     const documentPort = new FakeDocument();
     const bookmarks = new FakeElement();
     renderLibrary(
-      { kind: "ready", rows: [{ ...row, title: "" }] },
+      { kind: "ready", rows: [{ ...row, title: "" }], rowStates: {} },
       { document: documentPort, status: new FakeElement(), bookmarks },
       vi.fn(),
     );
