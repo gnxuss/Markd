@@ -29,7 +29,8 @@ export type BookmarkGesture = "primary" | "modifier-primary" | "middle";
 
 export type OpenedBookmark = {
   readonly libraryPage: Page;
-  readonly openedPage: Page;
+  readonly openedUrl: string;
+  readonly libraryVisibility: DocumentVisibilityState;
   readonly matchingTargetCount: number;
 };
 
@@ -91,9 +92,44 @@ export async function launchExtension(nodes: readonly SeedNode[]): Promise<Exten
 }
 
 export async function openSeededBookmark(
-  _fixture: ExtensionFixture,
-  _key: string,
-  _gesture: BookmarkGesture,
+  fixture: ExtensionFixture,
+  key: string,
+  gesture: BookmarkGesture,
 ): Promise<OpenedBookmark> {
-  throw new TypeError("Trusted tab observation is not implemented");
+  const bookmark = fixture.bookmarks[key];
+  if (bookmark === undefined) throw new TypeError(`Unknown seeded bookmark: ${key}`);
+  const libraryPage = await fixture.openLibrary();
+  await libraryPage.bringToFront();
+  const link = await libraryPage.waitForSelector(`[data-bookmark-id="${bookmark.id}"] .bookmark-link`);
+  if (link === null) throw new TypeError(`Bookmark row did not render: ${key}`);
+  const openedTarget = fixture.browser.waitForTarget((candidate) => candidate.url() === bookmark.url);
+  switch (gesture) {
+    case "primary":
+      await link.click();
+      break;
+    case "modifier-primary": {
+      const usesMeta = await libraryPage.evaluate(() => navigator.platform.startsWith("Mac"));
+      if (usesMeta) {
+        await libraryPage.keyboard.down("Meta");
+        await link.click();
+        await libraryPage.keyboard.up("Meta");
+      } else {
+        await libraryPage.keyboard.down("Control");
+        await link.click();
+        await libraryPage.keyboard.up("Control");
+      }
+      break;
+    }
+    case "middle":
+      await link.click({ button: "middle" });
+      break;
+    default: {
+      const exhaustiveGesture: never = gesture;
+      return exhaustiveGesture;
+    }
+  }
+  const target = await openedTarget;
+  const libraryVisibility = await libraryPage.evaluate(() => document.visibilityState);
+  const matchingTargetCount = fixture.browser.targets().filter((candidate) => candidate.url() === bookmark.url).length;
+  return { libraryPage, openedUrl: target.url(), libraryVisibility, matchingTargetCount };
 }
