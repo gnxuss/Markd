@@ -57,9 +57,16 @@ describe("built extension tracer", () => {
         { title: bookmarkTitle, url: bookmarkUrl },
       );
 
-      // When: the toolbar action's library URL is opened and its rendered row is activated.
+      // When: the toolbar action is triggered and its rendered bookmark row is activated.
       const libraryUrl = await worker.evaluate(() => chrome.runtime.getURL("library.html"));
-      await worker.evaluate(async (url) => chrome.tabs.create({ active: true, url }), libraryUrl);
+      const extension = [...(await browser.extensions()).values()].find(
+        (candidate) => candidate.name === "Markd",
+      );
+      if (extension === undefined) {
+        throw new TypeError("The built Markd extension was not loaded");
+      }
+      const actionPage = await browser.newPage();
+      await extension.triggerAction(actionPage);
       const libraryTarget = await browser.waitForTarget((candidate) => candidate.url() === libraryUrl);
       const libraryPage = await libraryTarget.page();
       if (libraryPage === null) {
