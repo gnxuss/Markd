@@ -1,0 +1,20 @@
+:root {
+  color-scheme: light;
+  font-family: system-ui, sans-serif;
+  background: #f7f7f5;
+  color: #20201e;
+}
+
+body { margin: 0; }
+main { max-width: 52rem; margin: 0 auto; padding: 1.5rem; }
+.bookmark-list { margin: 0; padding: 0; overflow: hidden; background: #fff; border: 1px solid #deded8; border-radius: 0.75rem; list-style: none; }
+.bookmark-row + .bookmark-row { border-top: 1px solid #ecece7; }
+.bookmark-link { display: grid; gap: 0.18rem; padding: 0.72rem 0.9rem; color: inherit; text-decoration: none; }
+.bookmark-link:hover { background: #f4f4ef; }
+.bookmark-link:focus-visible { outline: 3px solid #315efb; outline-offset: -3px; }
+.bookmark-title, .bookmark-url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bookmark-title { font-size: 0.95rem; font-weight: 650; }
+.bookmark-url { color: #66665f; font-size: 0.8rem; }
+.bookmark-tags { min-height: 0.25rem; overflow-x: auto; white-space: nowrap; }
+[aria-busy="true"] { opacity: 0.65; }
+.bookmark-error { color: #a62525; font-size: 0.78rem; }

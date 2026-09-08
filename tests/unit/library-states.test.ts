@@ -11,7 +11,7 @@ class FakeElement {
   hidden = false;
   textContent: string | null = null;
 
-  addEventListener(): void {}
+  addEventListener(_type: string, _listener: (event: Event) => void): void {}
 
   append(...nodes: readonly FakeElement[]): void {
     this.children.push(...nodes);
@@ -29,6 +29,22 @@ class FakeElement {
 class FakeDocument {
   createElement(): FakeElement {
     return new FakeElement();
+  }
+
+  addEventListener(element: FakeElement, type: string, listener: (event: Event) => void): void {
+    element.addEventListener(type, listener);
+  }
+
+  append(element: FakeElement, nodes: readonly FakeElement[]): void {
+    element.append(...nodes);
+  }
+
+  replaceChildren(element: FakeElement, nodes: readonly FakeElement[]): void {
+    element.replaceChildren(...nodes);
+  }
+
+  setAttribute(element: FakeElement, name: string, value: string): void {
+    element.setAttribute(name, value);
   }
 }
 
@@ -73,7 +89,7 @@ describe("library state", () => {
       { document: documentPort, status, bookmarks },
       vi.fn(),
     );
-    const link = bookmarks.children[0]?.children[0];
+    const link = bookmarks.children[0]?.children[0]?.children[0];
     expect(link?.attributes.get("href")).toBe(row.url);
     expect(link?.children[0]?.textContent).toBe(row.title);
     expect(link?.children[1]?.textContent).toBe("example.com/reference");
@@ -88,6 +104,8 @@ describe("library state", () => {
       { document: documentPort, status: new FakeElement(), bookmarks },
       vi.fn(),
     );
-    expect(bookmarks.children[0]?.children[0]?.children[0]?.textContent).toBe("Untitled bookmark");
+    expect(bookmarks.children[0]?.children[0]?.children[0]?.children[0]?.textContent).toBe(
+      "Untitled bookmark",
+    );
   });
 });

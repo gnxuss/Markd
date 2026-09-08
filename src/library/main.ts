@@ -1,17 +1,7 @@
-function firstUrlNode(
-  nodes: readonly chrome.bookmarks.BookmarkTreeNode[],
-): chrome.bookmarks.BookmarkTreeNode | undefined {
-  for (const node of nodes) {
-    if (node.url !== undefined) {
-      return node;
-    }
-    const descendant = firstUrlNode(node.children ?? []);
-    if (descendant !== undefined) {
-      return descendant;
-    }
-  }
-  return undefined;
-}
+import { loadBookmarkRows } from "../bookmarks/chrome-bookmarks.js";
+import { createLibraryController } from "./controller.js";
+import { renderLibrary } from "./render.js";
+import type { RenderElement } from "./render.js";
 
 function requiredElement(id: string): HTMLElement {
   const element = document.getElementById(id);
@@ -21,32 +11,31 @@ function requiredElement(id: string): HTMLElement {
   return element;
 }
 
-function renderBookmark(node: chrome.bookmarks.BookmarkTreeNode, container: HTMLElement): void {
-  if (node.url === undefined) {
-    throw new TypeError("Cannot render a bookmark without a URL");
-  }
-  const nativeUrl = node.url;
-  const link = document.createElement("a");
-  link.href = nativeUrl;
-  link.textContent = node.title.length > 0 ? node.title : nativeUrl;
-  link.addEventListener("click", (event) => {
-    event.preventDefault();
-    void chrome.tabs.create({ active: true, url: nativeUrl });
-  });
-  container.replaceChildren(link);
-}
-
-async function bootstrap(): Promise<void> {
-  const status = requiredElement("status");
-  const container = requiredElement("bookmarks");
-  const roots = await chrome.bookmarks.getTree();
-  const bookmark = firstUrlNode(roots);
-  if (bookmark === undefined) {
-    status.textContent = "No bookmarks found.";
-    return;
-  }
-  renderBookmark(bookmark, container);
-  status.textContent = "";
-}
-
-void bootstrap();
+const elements = {
+  document: {
+    createElement: (tagName: string) => document.createElement(tagName),
+    addEventListener: (element: RenderElement, type: string, listener: (event: Event) => void) => {
+      if (element instanceof HTMLElement) element.addEventListener(type, listener);
+    },
+    append: (element: RenderElement, nodes: readonly RenderElement[]) => {
+      if (element instanceof HTMLElement && nodes.every((node) => node instanceof HTMLElement)) {
+        element.append(...nodes);
+      }
+    },
+    replaceChildren: (element: RenderElement, nodes: readonly RenderElement[]) => {
+      if (element instanceof HTMLElement && nodes.every((node) => node instanceof HTMLElement)) {
+        element.replaceChildren(...nodes);
+      }
+    },
+    setAttribute: (element: RenderElement, name: string, value: string) => {
+      if (element instanceof HTMLElement) element.setAttribute(name, value);
+    },
+  },
+  status: requiredElement("status"),
+  bookmarks: requiredElement("bookmarks"),
+};
+const controller = createLibraryController({
+  loadRows: loadBookmarkRows,
+  render: (state) => renderLibrary(state, elements, () => undefined),
+});
+void controller.bootstrap();
