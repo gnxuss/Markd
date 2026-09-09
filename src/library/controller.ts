@@ -31,6 +31,7 @@ type LibraryControllerDependencies = {
 
 export type LibraryController = {
   readonly bootstrap: () => Promise<void>;
+  readonly refresh: () => Promise<void>;
   readonly activate: (event: BookmarkActivation, row: BookmarkRow) => Promise<void>;
   readonly addTag: (bookmarkId: string, input: string) => Promise<void>;
   readonly removeTag: (bookmarkId: string, tagKey: string) => Promise<void>;
@@ -52,6 +53,24 @@ export function createLibraryController(
   const writeTags = dependencies.writeTags ?? (async () => undefined);
   const schedule = dependencies.schedule ?? ((callback, duration) => window.setTimeout(callback, duration));
   const tagWriteQueues = new Map<string, Promise<void>>();
+
+  async function refresh(): Promise<void> {
+    try {
+      const [loadedRows, assignments] = await Promise.all([dependencies.loadRows(), loadTags()]);
+      const liveIds = new Set(loadedRows.map((row) => row.id));
+      rows = loadedRows.map((row) => ({ ...row, tags: assignments[row.id] ?? [] }));
+      rowStates = Object.fromEntries(Object.entries(rowStates).filter(([id]) => liveIds.has(id)));
+      tagStates = Object.fromEntries(Object.entries(tagStates).filter(([id]) => liveIds.has(id)));
+      if (rows.length === 0) dependencies.render({ kind: "empty" });
+      else renderReady();
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        dependencies.render({ kind: "error", message: "Bookmarks could not be loaded." });
+        return;
+      }
+      throw error;
+    }
+  }
 
   function renderReady(): void {
     const availableTagKeys = new Set(confirmedTagCatalog(rows).map((tag) => tag.key));
@@ -161,19 +180,9 @@ export function createLibraryController(
   return {
     bootstrap: async (): Promise<void> => {
       dependencies.render({ kind: "loading" });
-      try {
-        const [loadedRows, assignments] = await Promise.all([dependencies.loadRows(), loadTags()]);
-        rows = loadedRows.map((row) => ({ ...row, tags: assignments[row.id] ?? [] }));
-        if (rows.length === 0) dependencies.render({ kind: "empty" });
-        else renderReady();
-      } catch (error: unknown) {
-        if (error instanceof Error) {
-          dependencies.render({ kind: "error", message: "Bookmarks could not be loaded." });
-          return;
-        }
-        throw error;
-      }
+      await refresh();
     },
+    refresh,
     addTag: async (bookmarkId, input): Promise<void> => {
       await enqueueTagMutation(bookmarkId, () => performAddTag(bookmarkId, input));
     },

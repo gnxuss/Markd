@@ -1,5 +1,6 @@
 import { loadBookmarkRows } from "../bookmarks/chrome-bookmarks.js";
 import { loadTagAssignments, writeBookmarkTags } from "../tags/chrome-tag-storage.js";
+import { subscribeBookmarkLifecycle } from "./bookmark-lifecycle.js";
 import { createLibraryController } from "./controller.js";
 import { renderLibrary } from "./render.js";
 import type { RenderElement } from "./render.js";
@@ -61,4 +62,5 @@ elements.untaggedView.addEventListener("click", () => controller.selectView("unt
 elements.search.addEventListener("input", (event) => {
   if (event.currentTarget instanceof HTMLInputElement) controller.setSearch(event.currentTarget.value);
 });
-void controller.bootstrap();
+const lifecycle = subscribeBookmarkLifecycle(chrome.bookmarks, controller.refresh);
+void lifecycle.start();
