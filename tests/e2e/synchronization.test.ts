@@ -14,7 +14,7 @@ describe("live native synchronization built Chromium", () => {
     fixture = await launchExtension([
       { kind: "bookmark", key: "first", title: "First", url: "https://first.example/original" },
       { kind: "bookmark", key: "second", title: "Second", url: "https://second.example/original" },
-    ]);
+    ], true);
     const page = await fixture.openLibrary();
     const firstId = fixture.bookmarks["first"]?.id;
     const secondId = fixture.bookmarks["second"]?.id;
@@ -59,7 +59,7 @@ describe("inactive native synchronization built Chromium", () => {
   it("wakes the worker and cleans every recursively deleted descendant assignment", async () => {
     fixture = await launchExtension([
       { kind: "bookmark", key: "survivor", title: "Survivor", url: "https://survivor.example" },
-    ]);
+    ], true);
     const folderId = await fixture.native.create({ parentId: "1", title: "Disposable folder" });
     const firstId = await fixture.native.create({
       parentId: folderId,
@@ -112,7 +112,7 @@ describe("restart synchronization built Chromium", () => {
       { kind: "bookmark", key: "first", title: "First Design Guide", url: duplicateUrl },
       { kind: "bookmark", key: "second", title: "Second Research", url: duplicateUrl },
       { kind: "bookmark", key: "untagged", title: "Fresh Untagged", url: "https://fresh.example" },
-    ]);
+    ], true);
     const firstId = fixture.bookmarks["first"]?.id;
     const secondId = fixture.bookmarks["second"]?.id;
     if (firstId === undefined || secondId === undefined) throw new TypeError("Duplicate seed IDs unavailable");

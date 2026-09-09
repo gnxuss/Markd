@@ -66,18 +66,23 @@ async function extensionWorker(browser: Browser, name: string): Promise<WebWorke
   return worker;
 }
 
-async function launchBrowser(userDataDir: string, driverPath: string): Promise<Browser> {
+async function launchBrowser(userDataDir: string, driverPath?: string): Promise<Browser> {
   return puppeteer.launch({
     headless: true,
-    enableExtensions: [extensionPath, driverPath],
+    enableExtensions: driverPath === undefined ? [extensionPath] : [extensionPath, driverPath],
     userDataDir,
   });
 }
 
-export async function launchExtension(nodes: readonly SeedNode[]): Promise<ExtensionFixture> {
+export async function launchExtension(
+  nodes: readonly SeedNode[],
+  withNativeDriver = false,
+): Promise<ExtensionFixture> {
   const fixtureDirectory = await mkdtemp(join(tmpdir(), "markd-e2e-"));
   const profileDirectory = join(fixtureDirectory, "profile");
-  const driverPath = await materializeNativeBookmarkDriver(fixtureDirectory);
+  const driverPath = withNativeDriver
+    ? await materializeNativeBookmarkDriver(fixtureDirectory)
+    : undefined;
   let activeBrowser = await launchBrowser(profileDirectory, driverPath);
   let activeWorker = await extensionWorker(activeBrowser, "Markd");
   const native = createNativeBookmarkDriver(() => activeBrowser);
@@ -103,7 +108,36 @@ export async function launchExtension(nodes: readonly SeedNode[]): Promise<Exten
       }
     }
   };
-  await createNodes("1", nodes);
+  if (withNativeDriver) {
+    await createNodes("1", nodes);
+  } else {
+    const workerSeeded = await activeWorker.evaluate(async (seedNodes: readonly SeedNode[]) => {
+      const createdBookmarks: Record<string, SeededBookmark> = {};
+      const createWorkerNodes = async (parentId: string, children: readonly SeedNode[]): Promise<void> => {
+        for (const node of children) {
+          switch (node.kind) {
+            case "bookmark": {
+              const created = await chrome.bookmarks.create({ parentId, title: node.title, url: node.url });
+              createdBookmarks[node.key] = { ...node, id: created.id };
+              break;
+            }
+            case "folder": {
+              const created = await chrome.bookmarks.create({ parentId, title: node.title });
+              await createWorkerNodes(created.id, node.children);
+              break;
+            }
+            default: {
+              const exhaustiveNode: never = node;
+              return exhaustiveNode;
+            }
+          }
+        }
+      };
+      await createWorkerNodes("1", seedNodes);
+      return createdBookmarks;
+    }, nodes);
+    Object.assign(seeded, workerSeeded);
+  }
   const bookmarks: Readonly<Record<string, SeededBookmark>> = seeded;
   const libraryUrl = await activeWorker.evaluate(() => chrome.runtime.getURL("library.html"));
   return {
