@@ -5,6 +5,7 @@ declare module "node:fs/promises" {
   };
 
   export function mkdtemp(prefix: string): Promise<string>;
+  export function mkdir(path: string, options: { readonly recursive: true }): Promise<string | undefined>;
   export function readFile(path: string, encoding: "utf8"): Promise<string>;
   export function readdir(
     path: string,
@@ -14,6 +15,7 @@ declare module "node:fs/promises" {
     path: string,
     options: { readonly force: boolean; readonly recursive: boolean },
   ): Promise<void>;
+  export function writeFile(path: string, data: string): Promise<void>;
 }
 
 declare module "node:os" {
