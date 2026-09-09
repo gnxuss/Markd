@@ -52,14 +52,41 @@ export type OpenedBookmark = {
 
 const extensionPath = decodeURIComponent(new URL("../../dist", import.meta.url).pathname);
 
-async function extensionWorker(browser: Browser, name: string): Promise<WebWorker> {
+async function extensionWorker(
+  browser: Browser,
+  name: string,
+  distinguishExtension: boolean,
+): Promise<WebWorker> {
+  if (!distinguishExtension) {
+    const target = await browser.waitForTarget(
+      (candidate) => candidate.type() === "service_worker" && candidate.url().startsWith("chrome-extension://"),
+    );
+    const worker = await target.worker();
+    if (worker === null) throw new TypeError("The extension service worker target had no worker context");
+    return worker;
+  }
   await browser.waitForTarget((candidate) => candidate.type() === "service_worker");
   const extension = [...(await browser.extensions()).values()].find((candidate) => candidate.name === name);
   if (extension === undefined) throw new TypeError(`Extension was not loaded: ${name}`);
-  const existing = (await extension.workers())[0];
-  if (existing !== undefined) return existing;
+  for (const existing of await extension.workers()) {
+    try {
+      if (await existing.evaluate(() => chrome.runtime.getManifest().name) === name) return existing;
+    } catch (error: unknown) {
+      if (!(error instanceof Error)) throw error;
+    }
+  }
   const target = await browser.waitForTarget(
-    (candidate) => candidate.url() === `chrome-extension://${extension.id}/background.js`,
+    async (candidate) => {
+      if (candidate.url() !== `chrome-extension://${extension.id}/background.js`) return false;
+      const worker = await candidate.worker();
+      if (worker === null) return false;
+      try {
+        return await worker.evaluate(() => chrome.runtime.getManifest().name) === name;
+      } catch (error: unknown) {
+        if (error instanceof Error) return false;
+        throw error;
+      }
+    },
   );
   const worker = await target.worker();
   if (worker === null) throw new TypeError("The extension service worker target had no worker context");
@@ -84,7 +111,7 @@ export async function launchExtension(
     ? await materializeNativeBookmarkDriver(fixtureDirectory)
     : undefined;
   let activeBrowser = await launchBrowser(profileDirectory, driverPath);
-  let activeWorker = await extensionWorker(activeBrowser, "Markd");
+  let activeWorker = await extensionWorker(activeBrowser, "Markd", withNativeDriver);
   const native = createNativeBookmarkDriver(() => activeBrowser);
   let closed = false;
   const seeded: Record<string, SeededBookmark> = {};
@@ -169,7 +196,7 @@ export async function launchExtension(
       throw new TypeError("Markd worker did not terminate");
     },
     reacquireWorker: async () => {
-      activeWorker = await extensionWorker(activeBrowser, "Markd");
+      activeWorker = await extensionWorker(activeBrowser, "Markd", true);
       return activeWorker;
     },
     restartWorker: async () => {
@@ -184,12 +211,12 @@ export async function launchExtension(
       const openedLibrary = await libraryTarget.page();
       await openedLibrary?.close();
       if (!actionPage.isClosed()) await actionPage.close();
-      activeWorker = await extensionWorker(activeBrowser, "Markd");
+      activeWorker = await extensionWorker(activeBrowser, "Markd", withNativeDriver);
     },
     restartBrowser: async () => {
       await activeBrowser.close();
       activeBrowser = await launchBrowser(profileDirectory, driverPath);
-      activeWorker = await extensionWorker(activeBrowser, "Markd");
+      activeWorker = await extensionWorker(activeBrowser, "Markd", withNativeDriver);
     },
     close: async () => {
       if (closed) return;

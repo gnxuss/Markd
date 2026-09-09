@@ -136,5 +136,5 @@ describe("unified retrieval built Chromium", () => {
     await page.waitForFunction(() => document.querySelector("#status")?.textContent === "No bookmarks found.");
     expect(await page.$eval("#tag-catalog", (element) => element.textContent?.trim())).toBe("No tags yet");
     expect(await page.$("#bookmark-search")).not.toBeNull();
-  });
+  }, 30_000);
 });

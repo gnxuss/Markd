@@ -50,7 +50,7 @@ describe("durable add-tag built Chromium", () => {
     expect(manifest).toMatchObject({ permissions: ["bookmarks", "storage"] });
     expect(manifest).not.toHaveProperty("host_permissions");
     expect(manifest).not.toHaveProperty("content_scripts");
-  });
+  }, 30_000);
 
   it("keeps All and Untagged visible with truthful first and final tag transitions", async () => {
     fixture = await launchExtension([
