@@ -17,7 +17,7 @@ body { margin: 0; }
 .tag-catalog-section { margin-top: 1.6rem; }
 .tag-catalog-section h2 { margin: 0 0 0.55rem; color: #77776f; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; }
 #tag-catalog { display: grid; gap: 0.3rem; }
-.catalog-tag { overflow: hidden; padding: 0.38rem 0.48rem; border: 1px solid transparent; border-radius: 0.4rem; background: transparent; color: #515149; font: inherit; font-size: 0.82rem; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.catalog-tag { overflow: hidden; max-width: 100%; padding: 0.38rem 0.48rem; border: 1px solid transparent; border-radius: 0.4rem; background: transparent; color: #515149; font: inherit; font-size: 0.82rem; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .catalog-tag:hover { background: #ecece6; color: #20201e; }
 .catalog-tag[aria-pressed="true"] { border-color: #aeb7f0; background: #e7e9ff; color: #253682; }
 .tag-catalog-empty { margin: 0; color: #818179; font-size: 0.82rem; }
@@ -56,4 +56,5 @@ body { margin: 0; }
   .view-navigation { grid-template-columns: 1fr 1fr; }
   .tag-catalog-section { margin-top: 1rem; }
   #tag-catalog { display: flex; overflow-x: auto; }
+  .catalog-tag { flex: 0 1 auto; min-width: 0; }
 }

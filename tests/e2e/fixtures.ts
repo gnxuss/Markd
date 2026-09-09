@@ -103,6 +103,9 @@ export async function launchExtension(nodes: readonly SeedNode[]): Promise<Exten
     openLibrary: async () => {
       const page = await activeBrowser.newPage();
       await page.goto(libraryUrl);
+      await page.waitForFunction(
+        () => document.querySelector("#status")?.textContent !== "Loading bookmarks…",
+      );
       return page;
     },
     restartWorker: async () => {

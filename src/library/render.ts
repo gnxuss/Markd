@@ -152,10 +152,14 @@ export function renderLibrary(
             });
         elements.document.replaceChildren(elements.tagCatalog, catalogNodes);
       }
-      const emptyUntagged = state.view === "untagged" && state.rows.length === 0;
-      elements.status.textContent = emptyUntagged ? "All bookmarks are tagged." : "";
-      elements.status.hidden = !emptyUntagged;
-      if (emptyUntagged) return;
+      const hasActiveCriteria = state.query.trim().length > 0 || state.selectedTagKeys.length > 0;
+      const noMatches = hasActiveCriteria && state.rows.length === 0;
+      const emptyUntagged = !hasActiveCriteria && state.view === "untagged" && state.rows.length === 0;
+      elements.status.textContent = noMatches
+        ? "No bookmarks match your search and filters."
+        : emptyUntagged ? "All bookmarks are tagged." : "";
+      elements.status.hidden = !noMatches && !emptyUntagged;
+      if (noMatches || emptyUntagged) return;
       const list = elements.document.createElement("ul");
       list.className = "bookmark-list";
       for (const row of state.rows) {
