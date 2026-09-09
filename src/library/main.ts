@@ -41,6 +41,7 @@ const elements = {
   allView: requiredElement("all-view"),
   untaggedView: requiredElement("untagged-view"),
   tagCatalog: requiredElement("tag-catalog"),
+  search: requiredElement("bookmark-search"),
 };
 const controller = createLibraryController({
   loadRows: loadBookmarkRows,
@@ -52,8 +53,12 @@ const controller = createLibraryController({
     (event, row) => { void controller.activate(event, row); },
     (bookmarkId, input) => { void controller.addTag(bookmarkId, input); },
     (bookmarkId, tagKey) => { void controller.removeTag(bookmarkId, tagKey); },
+    (tagKey) => controller.toggleTagFilter(tagKey),
   ),
 });
 elements.allView.addEventListener("click", () => controller.selectView("all"));
 elements.untaggedView.addEventListener("click", () => controller.selectView("untagged"));
+elements.search.addEventListener("input", (event) => {
+  if (event.currentTarget instanceof HTMLInputElement) controller.setSearch(event.currentTarget.value);
+});
 void controller.bootstrap();

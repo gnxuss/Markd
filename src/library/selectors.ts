@@ -1,10 +1,16 @@
-import type { BookmarkRow, LibraryView, TagRecord } from "../types.js";
+import type { BookmarkRow, LibraryView, RetrievalCriteria, TagRecord } from "../types.js";
 
 export function selectRows(
   rows: readonly BookmarkRow[],
   view: LibraryView,
+  criteria: RetrievalCriteria = { query: "", selectedTagKeys: [] },
 ): readonly BookmarkRow[] {
-  return view === "all" ? rows : rows.filter((row) => row.tags.length === 0);
+  const query = criteria.query.trim().toLocaleLowerCase();
+  return rows.filter((row) => {
+    if (view === "untagged" && row.tags.length > 0) return false;
+    if (query.length > 0 && !`${row.title}\n${row.url}`.toLocaleLowerCase().includes(query)) return false;
+    return criteria.selectedTagKeys.every((key) => row.tags.some((tag) => tag.key === key));
+  });
 }
 
 export function confirmedTagCatalog(rows: readonly BookmarkRow[]): readonly TagRecord[] {

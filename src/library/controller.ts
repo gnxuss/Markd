@@ -5,6 +5,7 @@ import type {
   LibraryState,
   RowOpenState,
   RowTagState,
+  RetrievalCriteria,
   TagAssignments,
   TagRecord,
   LibraryView,
@@ -34,6 +35,8 @@ export type LibraryController = {
   readonly addTag: (bookmarkId: string, input: string) => Promise<void>;
   readonly removeTag: (bookmarkId: string, tagKey: string) => Promise<void>;
   readonly selectView: (view: LibraryView) => void;
+  readonly setSearch: (query: string) => void;
+  readonly toggleTagFilter: (tagKey: string) => void;
 };
 
 export function createLibraryController(
@@ -43,6 +46,7 @@ export function createLibraryController(
   let rowStates: Readonly<Record<string, RowOpenState>> = {};
   let tagStates: Readonly<Record<string, RowTagState>> = {};
   let view: LibraryView = "all";
+  let criteria: RetrievalCriteria = { query: "", selectedTagKeys: [] };
   const open = dependencies.open ?? openBookmark;
   const loadTags = dependencies.loadTags ?? (async (): Promise<TagAssignments> => ({}));
   const writeTags = dependencies.writeTags ?? (async () => undefined);
@@ -52,8 +56,10 @@ export function createLibraryController(
   function renderReady(): void {
     dependencies.render({
       kind: "ready",
-      rows: selectRows(rows, view),
+      rows: selectRows(rows, view, criteria),
       view,
+      query: criteria.query,
+      selectedTagKeys: criteria.selectedTagKeys,
       catalog: confirmedTagCatalog(rows),
       rowStates,
       tagStates,
@@ -171,6 +177,18 @@ export function createLibraryController(
     },
     selectView: (nextView): void => {
       view = nextView;
+      if (rows.length > 0) renderReady();
+    },
+    setSearch: (query): void => {
+      criteria = { ...criteria, query };
+      if (rows.length > 0) renderReady();
+    },
+    toggleTagFilter: (tagKey): void => {
+      if (!confirmedTagCatalog(rows).some((tag) => tag.key === tagKey)) return;
+      const selectedTagKeys = criteria.selectedTagKeys.includes(tagKey)
+        ? criteria.selectedTagKeys.filter((key) => key !== tagKey)
+        : [...criteria.selectedTagKeys, tagKey];
+      criteria = { ...criteria, selectedTagKeys };
       if (rows.length > 0) renderReady();
     },
     activate: async (event, row): Promise<void> => {

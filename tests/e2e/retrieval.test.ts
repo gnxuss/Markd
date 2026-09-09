@@ -29,14 +29,12 @@ describe("unified retrieval built Chromium", () => {
     await page.type("#bookmark-search", "ALPHA");
     expect(await page.$$(".bookmark-row")).toHaveLength(1);
     expect(await page.$(row("alpha"))).not.toBeNull();
-    await page.focus("#bookmark-search");
-    await page.keyboard.press("Control+A");
+    await page.click("#bookmark-search", { count: 3 });
     await page.type("#bookmark-search", "research.example.org/ARCH");
     expect(await page.$$(".bookmark-row")).toHaveLength(1);
     expect(await page.$(row("beta"))).not.toBeNull();
 
-    await page.focus("#bookmark-search");
-    await page.keyboard.press("Control+A");
+    await page.click("#bookmark-search", { count: 3 });
     await page.keyboard.press("Backspace");
     await page.click('[data-tag-key="design"]');
     expect(await page.$eval('[data-tag-key="design"]', (element) => element.getAttribute("aria-pressed"))).toBe("true");

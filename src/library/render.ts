@@ -31,6 +31,7 @@ export type LibraryElements = {
 export type ActivateBookmark = (event: BookmarkActivation, row: BookmarkRow) => void;
 export type AddTag = (bookmarkId: string, input: string) => void;
 export type RemoveTag = (bookmarkId: string, tagKey: string) => void;
+export type ToggleTagFilter = (tagKey: string) => void;
 
 function activationFromEvent(event: Event): BookmarkActivation | undefined {
   if (!(event instanceof MouseEvent)) return undefined;
@@ -104,6 +105,7 @@ export function renderLibrary(
   activate: ActivateBookmark,
   addTag: AddTag = () => undefined,
   removeTag: RemoveTag = () => undefined,
+  toggleTagFilter: ToggleTagFilter = () => undefined,
 ): void {
   elements.document.replaceChildren(elements.bookmarks, []);
   elements.status.hidden = false;
@@ -135,9 +137,17 @@ export function renderLibrary(
               return [empty];
             })()
           : state.catalog.map((tag) => {
-              const item = elements.document.createElement("span");
+              const item = elements.document.createElement("button");
               item.className = "catalog-tag";
               item.textContent = `#${tag.label}`;
+              elements.document.setAttribute(item, "type", "button");
+              elements.document.setAttribute(item, "data-tag-key", tag.key);
+              elements.document.setAttribute(
+                item,
+                "aria-pressed",
+                String(state.selectedTagKeys.includes(tag.key)),
+              );
+              elements.document.addEventListener(item, "click", () => toggleTagFilter(tag.key));
               return item;
             });
         elements.document.replaceChildren(elements.tagCatalog, catalogNodes);

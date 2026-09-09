@@ -5,6 +5,10 @@ export type TagRecord = {
 
 export type TagAssignments = Readonly<Record<string, readonly TagRecord[]>>;
 export type LibraryView = "all" | "untagged";
+export type RetrievalCriteria = {
+  readonly query: string;
+  readonly selectedTagKeys: readonly string[];
+};
 
 export type BookmarkRow = {
   readonly id: string;
@@ -35,6 +39,8 @@ export type LibraryState =
       readonly kind: "ready";
       readonly rows: readonly BookmarkRow[];
       readonly view: LibraryView;
+      readonly query: string;
+      readonly selectedTagKeys: readonly string[];
       readonly catalog: readonly TagRecord[];
       readonly rowStates: Readonly<Record<string, RowOpenState>>;
       readonly tagStates: Readonly<Record<string, RowTagState>>;

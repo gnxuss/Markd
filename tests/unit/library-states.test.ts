@@ -85,7 +85,7 @@ describe("library state", () => {
     const status = new FakeElement();
     const bookmarks = new FakeElement();
     renderLibrary(
-      { kind: "ready", rows: [row], view: "all", catalog: [], rowStates: {}, tagStates: {} },
+      { kind: "ready", rows: [row], view: "all", query: "", selectedTagKeys: [], catalog: [], rowStates: {}, tagStates: {} },
       { document: documentPort, status, bookmarks },
       vi.fn(),
     );
@@ -102,7 +102,7 @@ describe("library state", () => {
     const documentPort = new FakeDocument();
     const bookmarks = new FakeElement();
     renderLibrary(
-      { kind: "ready", rows: [{ ...row, title: "" }], view: "all", catalog: [], rowStates: {}, tagStates: {} },
+      { kind: "ready", rows: [{ ...row, title: "" }], view: "all", query: "", selectedTagKeys: [], catalog: [], rowStates: {}, tagStates: {} },
       { document: documentPort, status: new FakeElement(), bookmarks },
       vi.fn(),
     );
