@@ -6,31 +6,34 @@ import {
   reconcileStaleMetadata,
 } from "../../src/bookmarks/metadata-reconciliation.js";
 
-const tree = [{
+const removedTree: chrome.bookmarks.BookmarkTreeNode = {
   id: "0",
   title: "root",
+  syncing: false,
   children: [{
     id: "1",
     title: "folder",
+    syncing: false,
     children: [
-      { id: "live-one", title: "One", url: "https://one.example" },
-      { id: "nested", title: "Nested", children: [
-        { id: "live-two", title: "Two", url: "https://two.example" },
+      { id: "live-one", title: "One", url: "https://one.example", syncing: false },
+      { id: "nested", title: "Nested", syncing: false, children: [
+        { id: "live-two", title: "Two", url: "https://two.example", syncing: false },
       ] },
     ],
   }],
-}] satisfies readonly chrome.bookmarks.BookmarkTreeNode[];
+};
+const tree: readonly chrome.bookmarks.BookmarkTreeNode[] = [removedTree];
 
 describe("bookmark metadata reconciliation", () => {
   it("collects only URL-bearing IDs from a recursively removed subtree", () => {
-    expect(collectUrlBookmarkIds(tree[0])).toEqual(["live-one", "live-two"]);
+    expect(collectUrlBookmarkIds(removedTree)).toEqual(["live-one", "live-two"]);
   });
 
   it("removes every URL descendant from one recursive folder event", async () => {
     const removeAssignments = vi.fn(async (_ids: readonly string[]) => undefined);
 
-    await reconcileRemovedBookmark(tree[0], removeAssignments);
-    await reconcileRemovedBookmark(tree[0], removeAssignments);
+    await reconcileRemovedBookmark(removedTree, removeAssignments);
+    await reconcileRemovedBookmark(removedTree, removeAssignments);
 
     expect(removeAssignments).toHaveBeenNthCalledWith(1, ["live-one", "live-two"]);
     expect(removeAssignments).toHaveBeenNthCalledWith(2, ["live-one", "live-two"]);

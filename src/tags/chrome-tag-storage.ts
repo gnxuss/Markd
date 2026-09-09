@@ -33,15 +33,36 @@ function parseStoredTags(value: unknown): readonly TagRecord[] | undefined {
   return tags;
 }
 
+export function bookmarkIdFromAssignmentKey(storageKey: string): string | undefined {
+  if (!storageKey.startsWith(STORAGE_PREFIX)) return undefined;
+  const bookmarkId = storageKey.slice(STORAGE_PREFIX.length);
+  return bookmarkId.length > 0 ? bookmarkId : undefined;
+}
+
+export async function listBookmarkTagIds(): Promise<readonly string[]> {
+  const stored: unknown = await chrome.storage.local.get(null);
+  if (!isRecord(stored)) return [];
+  return Object.keys(stored).flatMap((storageKey) => {
+    const bookmarkId = bookmarkIdFromAssignmentKey(storageKey);
+    return bookmarkId === undefined ? [] : [bookmarkId];
+  });
+}
+
+export async function removeBookmarkTagAssignments(bookmarkIds: readonly string[]): Promise<void> {
+  const storageKeys = [...new Set(bookmarkIds)]
+    .filter((bookmarkId) => bookmarkId.length > 0)
+    .map((bookmarkId) => `${STORAGE_PREFIX}${bookmarkId}`);
+  if (storageKeys.length > 0) await chrome.storage.local.remove(storageKeys);
+}
+
 export async function loadTagAssignments(): Promise<TagAssignments> {
   const stored: unknown = await chrome.storage.local.get(null);
   if (!isRecord(stored)) return {};
   const assignments: Record<string, readonly TagRecord[]> = {};
   for (const [storageKey, value] of Object.entries(stored)) {
-    if (!storageKey.startsWith(STORAGE_PREFIX)) continue;
-    const bookmarkId = storageKey.slice(STORAGE_PREFIX.length);
+    const bookmarkId = bookmarkIdFromAssignmentKey(storageKey);
     const tags = parseStoredTags(value);
-    if (bookmarkId.length > 0 && tags !== undefined) assignments[bookmarkId] = tags;
+    if (bookmarkId !== undefined && tags !== undefined) assignments[bookmarkId] = tags;
   }
   return assignments;
 }
