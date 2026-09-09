@@ -54,6 +54,11 @@ export function createLibraryController(
   const tagWriteQueues = new Map<string, Promise<void>>();
 
   function renderReady(): void {
+    const availableTagKeys = new Set(confirmedTagCatalog(rows).map((tag) => tag.key));
+    const selectedTagKeys = criteria.selectedTagKeys.filter((key) => availableTagKeys.has(key));
+    if (selectedTagKeys.length !== criteria.selectedTagKeys.length) {
+      criteria = { ...criteria, selectedTagKeys };
+    }
     dependencies.render({
       kind: "ready",
       rows: selectRows(rows, view, criteria),
