@@ -2,7 +2,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import puppeteer, { type Browser, type Page, type WebWorker } from "puppeteer";
+import type { Browser, Page, WebWorker } from "puppeteer";
+import { launchExtensionRuntime } from "./extension-runtime.js";
 import {
   createNativeBookmarkDriver,
   materializeNativeBookmarkDriver,
@@ -52,55 +53,6 @@ export type OpenedBookmark = {
 
 const extensionPath = decodeURIComponent(new URL("../../dist", import.meta.url).pathname);
 
-async function extensionWorker(
-  browser: Browser,
-  name: string,
-  distinguishExtension: boolean,
-): Promise<WebWorker> {
-  if (!distinguishExtension) {
-    const target = await browser.waitForTarget(
-      (candidate) => candidate.type() === "service_worker" && candidate.url().startsWith("chrome-extension://"),
-    );
-    const worker = await target.worker();
-    if (worker === null) throw new TypeError("The extension service worker target had no worker context");
-    return worker;
-  }
-  await browser.waitForTarget((candidate) => candidate.type() === "service_worker");
-  const extension = [...(await browser.extensions()).values()].find((candidate) => candidate.name === name);
-  if (extension === undefined) throw new TypeError(`Extension was not loaded: ${name}`);
-  for (const existing of await extension.workers()) {
-    try {
-      if (await existing.evaluate(() => chrome.runtime.getManifest().name) === name) return existing;
-    } catch (error: unknown) {
-      if (!(error instanceof Error)) throw error;
-    }
-  }
-  const target = await browser.waitForTarget(
-    async (candidate) => {
-      if (candidate.url() !== `chrome-extension://${extension.id}/background.js`) return false;
-      const worker = await candidate.worker();
-      if (worker === null) return false;
-      try {
-        return await worker.evaluate(() => chrome.runtime.getManifest().name) === name;
-      } catch (error: unknown) {
-        if (error instanceof Error) return false;
-        throw error;
-      }
-    },
-  );
-  const worker = await target.worker();
-  if (worker === null) throw new TypeError("The extension service worker target had no worker context");
-  return worker;
-}
-
-async function launchBrowser(userDataDir: string, driverPath?: string): Promise<Browser> {
-  return puppeteer.launch({
-    headless: true,
-    enableExtensions: driverPath === undefined ? [extensionPath] : [extensionPath, driverPath],
-    userDataDir,
-  });
-}
-
 export async function launchExtension(
   nodes: readonly SeedNode[],
   withNativeDriver = false,
@@ -110,9 +62,13 @@ export async function launchExtension(
   const driverPath = withNativeDriver
     ? await materializeNativeBookmarkDriver(fixtureDirectory)
     : undefined;
-  let activeBrowser = await launchBrowser(profileDirectory, driverPath);
-  let activeWorker = await extensionWorker(activeBrowser, "Markd", withNativeDriver);
-  const native = createNativeBookmarkDriver(() => activeBrowser);
+  const runtime = await launchExtensionRuntime({
+    userDataDir: profileDirectory,
+    extensionPath,
+    distinguishExtension: withNativeDriver,
+    ...(driverPath === undefined ? {} : { driverPath }),
+  });
+  const native = createNativeBookmarkDriver(() => runtime.browser);
   let closed = false;
   const seeded: Record<string, SeededBookmark> = {};
   const createNodes = async (parentId: string, children: readonly SeedNode[]): Promise<void> => {
@@ -138,7 +94,7 @@ export async function launchExtension(
   if (withNativeDriver) {
     await createNodes("1", nodes);
   } else {
-    const workerSeeded = await activeWorker.evaluate(async (seedNodes: readonly SeedNode[]) => {
+    const workerSeeded = await runtime.worker.evaluate(async (seedNodes: readonly SeedNode[]) => {
       const createdBookmarks: Record<string, SeededBookmark> = {};
       const createWorkerNodes = async (parentId: string, children: readonly SeedNode[]): Promise<void> => {
         for (const node of children) {
@@ -166,15 +122,15 @@ export async function launchExtension(
     Object.assign(seeded, workerSeeded);
   }
   const bookmarks: Readonly<Record<string, SeededBookmark>> = seeded;
-  const libraryUrl = await activeWorker.evaluate(() => chrome.runtime.getURL("library.html"));
+  const libraryUrl = await runtime.worker.evaluate(() => chrome.runtime.getURL("library.html"));
   return {
-    get browser(): Browser { return activeBrowser; },
-    get worker(): WebWorker { return activeWorker; },
+    get browser(): Browser { return runtime.browser; },
+    get worker(): WebWorker { return runtime.worker; },
     libraryUrl,
     bookmarks,
     native,
     openLibrary: async () => {
-      const page = await activeBrowser.newPage();
+      const page = await runtime.browser.newPage();
       await page.goto(libraryUrl);
       await page.waitForFunction(
         () => document.querySelector("#status")?.textContent !== "Loading bookmarks…",
@@ -182,46 +138,17 @@ export async function launchExtension(
       return page;
     },
     closeAllLibraryPages: async () => {
-      const pages = await activeBrowser.pages();
+      const pages = await runtime.browser.pages();
       await Promise.all(pages.filter((page) => page.url() === libraryUrl).map((page) => page.close()));
     },
-    terminateWorker: async () => {
-      await activeWorker.close();
-      try {
-        await activeWorker.evaluate(() => chrome.runtime.id);
-      } catch (error: unknown) {
-        if (error instanceof Error) return;
-        throw error;
-      }
-      throw new TypeError("Markd worker did not terminate");
-    },
-    reacquireWorker: async () => {
-      activeWorker = await extensionWorker(activeBrowser, "Markd", true);
-      return activeWorker;
-    },
-    restartWorker: async () => {
-      await activeWorker.close();
-      const extension = [...(await activeBrowser.extensions()).values()].find(
-        (candidate) => candidate.name === "Markd",
-      );
-      if (extension === undefined) throw new TypeError("The built Markd extension was not loaded");
-      const actionPage = await activeBrowser.newPage();
-      await extension.triggerAction(actionPage);
-      const libraryTarget = await activeBrowser.waitForTarget((candidate) => candidate.url() === libraryUrl);
-      const openedLibrary = await libraryTarget.page();
-      await openedLibrary?.close();
-      if (!actionPage.isClosed()) await actionPage.close();
-      activeWorker = await extensionWorker(activeBrowser, "Markd", withNativeDriver);
-    },
-    restartBrowser: async () => {
-      await activeBrowser.close();
-      activeBrowser = await launchBrowser(profileDirectory, driverPath);
-      activeWorker = await extensionWorker(activeBrowser, "Markd", withNativeDriver);
-    },
+    terminateWorker: runtime.terminateWorker,
+    reacquireWorker: runtime.reacquireWorker,
+    restartWorker: async () => runtime.restartWorker(libraryUrl),
+    restartBrowser: runtime.restartBrowser,
     close: async () => {
       if (closed) return;
       closed = true;
-      await activeBrowser.close();
+      await runtime.close();
       await rm(fixtureDirectory, { force: true, recursive: true });
     },
   };
