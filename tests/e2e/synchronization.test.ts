@@ -122,7 +122,8 @@ describe("restart synchronization built Chromium", () => {
       await page.type(`${selector} .tag-input`, label);
       await page.keyboard.press("Enter");
       await page.waitForFunction(
-        ({ row, tag }) => document.querySelector(row)?.textContent?.includes(tag) === true,
+        ({ row, tag }) => Array.from(document.querySelectorAll(`${row} .tag-chip > span`))
+          .some((chip) => chip.textContent === tag),
         {},
         { row: selector, tag: label },
       );
