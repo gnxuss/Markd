@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  bookmarkIdFromAssignmentKey,
+  listBookmarkTagIds,
   loadTagAssignments,
+  removeBookmarkTagAssignments,
   writeBookmarkTags,
 } from "../../src/tags/chrome-tag-storage.js";
 
@@ -10,6 +13,35 @@ afterEach(() => {
 });
 
 describe("Chrome tag storage", () => {
+  it("enumerates only exact current-namespace native IDs", async () => {
+    const get = vi.fn(async () => ({
+      "bookmark-tags:1:native-one": { version: 1, tags: [] },
+      "bookmark-tags:1:native-two": "malformed but owned",
+      "bookmark-tags:1:": { version: 1, tags: [] },
+      "bookmark-tags:10:not-current": { version: 1, tags: [] },
+      unrelated: true,
+    }));
+    vi.stubGlobal("chrome", { storage: { local: { get } } });
+
+    await expect(listBookmarkTagIds()).resolves.toEqual(["native-one", "native-two"]);
+    expect(bookmarkIdFromAssignmentKey("bookmark-tags:1:native-one")).toBe("native-one");
+    expect(bookmarkIdFromAssignmentKey("bookmark-tags:10:not-current")).toBeUndefined();
+  });
+
+  it("removes exact generated keys in one idempotent operation", async () => {
+    const remove = vi.fn(async (_keys: readonly string[]) => undefined);
+    vi.stubGlobal("chrome", { storage: { local: { remove } } });
+
+    await removeBookmarkTagAssignments(["native-one", "native-two", "native-one"]);
+    await removeBookmarkTagAssignments([]);
+
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(remove).toHaveBeenCalledWith([
+      "bookmark-tags:1:native-one",
+      "bookmark-tags:1:native-two",
+    ]);
+  });
+
   it("loads only valid versioned native-ID assignments", async () => {
     const get = vi.fn(async () => ({
       "bookmark-tags:1:native-one": {
