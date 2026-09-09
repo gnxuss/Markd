@@ -110,4 +110,39 @@ describe("library state", () => {
       "Untitled bookmark",
     );
   });
+
+  it.each([
+    ["all", "missing", [], "No bookmarks match your search and filters."],
+    ["all", "", ["design"], "No bookmarks match your search and filters."],
+    ["untagged", "missing", [], "No bookmarks match your search and filters."],
+    ["untagged", "", [], "All bookmarks are tagged."],
+  ] as const)("renders the correct ready-state empty message for %s view", (view, query, selectedTagKeys, message) => {
+    const status = new FakeElement();
+    renderLibrary(
+      { kind: "ready", rows: [], view, query, selectedTagKeys, catalog: [], rowStates: {}, tagStates: {} },
+      { document: new FakeDocument(), status, bookmarks: new FakeElement() },
+      vi.fn(),
+    );
+    expect(status.hidden).toBe(false);
+    expect(status.textContent).toBe(message);
+  });
+
+  it("keeps source-empty and no-tags messages distinct from retrieval no-match", () => {
+    const documentPort = new FakeDocument();
+    const status = new FakeElement();
+    const catalog = new FakeElement();
+    renderLibrary(
+      { kind: "empty" },
+      { document: documentPort, status, bookmarks: new FakeElement(), tagCatalog: catalog },
+      vi.fn(),
+    );
+    expect(status.textContent).toBe("No bookmarks found.");
+
+    renderLibrary(
+      { kind: "ready", rows: [row], view: "all", query: "", selectedTagKeys: [], catalog: [], rowStates: {}, tagStates: {} },
+      { document: documentPort, status, bookmarks: new FakeElement(), tagCatalog: catalog },
+      vi.fn(),
+    );
+    expect(catalog.children[0]?.textContent).toBe("No tags yet");
+  });
 });
