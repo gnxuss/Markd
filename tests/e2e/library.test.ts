@@ -27,7 +27,7 @@ const libraryNodes = [
 let fixture: ExtensionFixture | undefined;
 
 afterEach(async () => {
-  await fixture?.browser.close();
+  await fixture?.close();
   fixture = undefined;
 });
 
@@ -81,7 +81,7 @@ describe("empty-library built Chromium", () => {
 });
 
 describe("permission-audit emitted package", () => {
-  it("requests exactly the Phase 1 browser authority", async () => {
+  it("requests exactly the Phase 2 browser authority", async () => {
     fixture = await launchExtension([]);
     const manifest: unknown = await fixture.worker.evaluate(async () => {
       const response = await fetch(chrome.runtime.getURL("manifest.json"));
@@ -92,7 +92,7 @@ describe("permission-audit emitted package", () => {
       name: "Markd",
       version: "0.1.0",
       minimum_chrome_version: "90",
-      permissions: ["bookmarks"],
+      permissions: ["bookmarks", "storage"],
       action: { default_title: "Open Markd" },
       background: { service_worker: "background.js", type: "module" },
     });

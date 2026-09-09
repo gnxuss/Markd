@@ -6,7 +6,20 @@
 }
 
 body { margin: 0; }
-main { max-width: 52rem; margin: 0 auto; padding: 1.5rem; }
+.app-shell { display: grid; grid-template-columns: 10.5rem minmax(0, 1fr); gap: 1.4rem; max-width: 64rem; margin: 0 auto; padding: 1.5rem; }
+.sidebar { position: sticky; top: 1.5rem; align-self: start; }
+.sidebar h1 { margin: 0 0 1.1rem; font-family: Georgia, serif; font-size: 1.65rem; letter-spacing: -0.04em; }
+.view-navigation { display: grid; gap: 0.22rem; }
+.view-control { width: 100%; padding: 0.5rem 0.62rem; border: 0; border-radius: 0.45rem; background: transparent; color: #5f5f58; font: inherit; font-weight: 650; text-align: left; cursor: pointer; }
+.view-control:hover { background: #ecece6; color: #20201e; }
+.view-control.active { background: #20201e; color: #fff; }
+.view-control:focus-visible { outline: 3px solid #315efb; outline-offset: 2px; }
+.tag-catalog-section { margin-top: 1.6rem; }
+.tag-catalog-section h2 { margin: 0 0 0.55rem; color: #77776f; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; }
+#tag-catalog { display: grid; gap: 0.3rem; }
+.catalog-tag { overflow: hidden; color: #515149; font-size: 0.82rem; text-overflow: ellipsis; white-space: nowrap; }
+.tag-catalog-empty { margin: 0; color: #818179; font-size: 0.82rem; }
+.library-panel { min-width: 0; }
 .bookmark-list { margin: 0; padding: 0; overflow: hidden; background: #fff; border: 1px solid #deded8; border-radius: 0.75rem; list-style: none; }
 .bookmark-row { position: relative; display: grid; gap: 0.18rem; padding: 0.72rem 0.9rem; }
 .bookmark-row + .bookmark-row { border-top: 1px solid #ecece7; }
@@ -18,6 +31,24 @@ main { max-width: 52rem; margin: 0 auto; padding: 1.5rem; }
 .bookmark-title, .bookmark-url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bookmark-title { font-size: 0.95rem; font-weight: 650; }
 .bookmark-url { color: #66665f; font-size: 0.8rem; }
-.bookmark-tags { min-height: 0.25rem; overflow-x: auto; white-space: nowrap; }
+.bookmark-tags { position: relative; z-index: 2; min-height: 0.25rem; overflow-x: auto; white-space: nowrap; }
+.tag-chip { display: inline-flex; align-items: center; gap: 0.18rem; margin-right: 0.35rem; padding: 0.12rem 0.2rem 0.12rem 0.42rem; border-radius: 999px; background: #e7e9ff; color: #253682; font-size: 0.76rem; }
+.tag-remove { display: inline-grid; width: 1.2rem; height: 1.2rem; place-items: center; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
+.tag-remove:hover { background: #cfd4ff; }
+.tag-editor { position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.4rem; max-width: 19rem; }
+.tag-input { min-width: 0; flex: 1; padding: 0.35rem 0.48rem; border: 1px solid #c9c9c1; border-radius: 0.38rem; font: inherit; }
+.tag-submit { padding: 0.35rem 0.62rem; border: 0; border-radius: 0.38rem; background: #315efb; color: #fff; font: inherit; cursor: pointer; }
+.tag-suggestions { position: absolute; top: calc(100% + 0.25rem); right: 0; left: 0; z-index: 3; display: grid; overflow: hidden; border: 1px solid #d5d5ce; border-radius: 0.5rem; background: #fff; box-shadow: 0 0.55rem 1.4rem rgb(32 32 30 / 14%); }
+.tag-suggestions:empty { display: none; }
+.tag-suggestion { padding: 0.48rem 0.58rem; border: 0; background: #fff; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.tag-suggestion:hover, .tag-suggestion:focus-visible { background: #f0f1eb; }
+.tag-input:focus-visible, .tag-submit:focus-visible, .tag-remove:focus-visible, .tag-suggestion:focus-visible { outline: 3px solid #315efb; outline-offset: 2px; }
 [aria-busy="true"] { opacity: 0.65; }
-.bookmark-error { color: #a62525; font-size: 0.78rem; }
+.bookmark-error, .tag-error { color: #a62525; font-size: 0.78rem; }
+@media (max-width: 42rem) {
+  .app-shell { grid-template-columns: 1fr; padding: 1rem; }
+  .sidebar { position: static; }
+  .view-navigation { grid-template-columns: 1fr 1fr; }
+  .tag-catalog-section { margin-top: 1rem; }
+  #tag-catalog { display: flex; overflow-x: auto; }
+}

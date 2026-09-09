@@ -1,5 +1,15 @@
 import { openBookmark } from "../browser/open-tab.js";
-import type { BookmarkRow, LibraryState, RowOpenState } from "../types.js";
+import { resolveTagInput } from "../tags/canonicalize.js";
+import type {
+  BookmarkRow,
+  LibraryState,
+  RowOpenState,
+  RowTagState,
+  TagAssignments,
+  TagRecord,
+  LibraryView,
+} from "../types.js";
+import { confirmedTagCatalog, selectRows } from "./selectors.js";
 
 export type BookmarkActivation = {
   readonly button: number;
@@ -11,6 +21,8 @@ export type BookmarkActivation = {
 
 type LibraryControllerDependencies = {
   readonly loadRows: () => Promise<readonly BookmarkRow[]>;
+  readonly loadTags?: () => Promise<TagAssignments>;
+  readonly writeTags?: (bookmarkId: string, tags: readonly TagRecord[]) => Promise<void>;
   readonly open?: (url: string, background: boolean) => Promise<void>;
   readonly render: (state: LibraryState) => void;
   readonly schedule?: (callback: () => void, duration: number) => void;
@@ -19,6 +31,9 @@ type LibraryControllerDependencies = {
 export type LibraryController = {
   readonly bootstrap: () => Promise<void>;
   readonly activate: (event: BookmarkActivation, row: BookmarkRow) => Promise<void>;
+  readonly addTag: (bookmarkId: string, input: string) => Promise<void>;
+  readonly removeTag: (bookmarkId: string, tagKey: string) => Promise<void>;
+  readonly selectView: (view: LibraryView) => void;
 };
 
 export function createLibraryController(
@@ -26,21 +41,120 @@ export function createLibraryController(
 ): LibraryController {
   let rows: readonly BookmarkRow[] = [];
   let rowStates: Readonly<Record<string, RowOpenState>> = {};
+  let tagStates: Readonly<Record<string, RowTagState>> = {};
+  let view: LibraryView = "all";
   const open = dependencies.open ?? openBookmark;
+  const loadTags = dependencies.loadTags ?? (async (): Promise<TagAssignments> => ({}));
+  const writeTags = dependencies.writeTags ?? (async () => undefined);
   const schedule = dependencies.schedule ?? ((callback, duration) => window.setTimeout(callback, duration));
+  const tagWriteQueues = new Map<string, Promise<void>>();
 
   function renderReady(): void {
-    dependencies.render({ kind: "ready", rows, rowStates });
+    dependencies.render({
+      kind: "ready",
+      rows: selectRows(rows, view),
+      view,
+      catalog: confirmedTagCatalog(rows),
+      rowStates,
+      tagStates,
+    });
+    tagStates = Object.fromEntries(
+      Object.entries(tagStates).map(([id, state]) => [id, { ...state, focus: false }]),
+    );
+  }
+
+  async function performAddTag(bookmarkId: string, input: string): Promise<void> {
+    const row = rows.find((candidate) => candidate.id === bookmarkId);
+    if (row === undefined) return;
+    const resolution = resolveTagInput(input, rows.flatMap((candidate) => candidate.tags));
+    if (resolution.kind === "invalid") {
+      tagStates = {
+        ...tagStates,
+        [bookmarkId]: { kind: "error", input, focus: false, message: "Enter a tag name." },
+      };
+      renderReady();
+      return;
+    }
+    if (row.tags.some((candidate) => candidate.key === resolution.tag.key)) {
+      tagStates = { ...tagStates, [bookmarkId]: { kind: "idle", input: "", focus: true } };
+      renderReady();
+      return;
+    }
+    const nextTags = [...row.tags, resolution.tag];
+    tagStates = { ...tagStates, [bookmarkId]: { kind: "saving", input, focus: false } };
+    renderReady();
+    try {
+      await writeTags(bookmarkId, nextTags);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        tagStates = {
+          ...tagStates,
+          [bookmarkId]: { kind: "error", input, focus: false, message: "Tag could not be saved." },
+        };
+        renderReady();
+        return;
+      }
+      tagStates = { ...tagStates, [bookmarkId]: { kind: "idle", input, focus: false } };
+      renderReady();
+      throw error;
+    }
+    rows = rows.map((candidate) => candidate.id === bookmarkId
+      ? { ...candidate, tags: nextTags }
+      : candidate);
+    tagStates = { ...tagStates, [bookmarkId]: { kind: "idle", input: "", focus: true } };
+    renderReady();
+  }
+
+  async function performRemoveTag(bookmarkId: string, tagKey: string): Promise<void> {
+    const row = rows.find((candidate) => candidate.id === bookmarkId);
+    if (row === undefined || !row.tags.some((tag) => tag.key === tagKey)) return;
+    const input = tagStates[bookmarkId]?.input ?? "";
+    const nextTags = row.tags.filter((tag) => tag.key !== tagKey);
+    tagStates = { ...tagStates, [bookmarkId]: { kind: "saving", input, focus: false } };
+    renderReady();
+    try {
+      await writeTags(bookmarkId, nextTags);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        tagStates = {
+          ...tagStates,
+          [bookmarkId]: { kind: "error", input, focus: false, message: "Tag could not be removed." },
+        };
+        renderReady();
+        return;
+      }
+      tagStates = { ...tagStates, [bookmarkId]: { kind: "idle", input, focus: false } };
+      renderReady();
+      throw error;
+    }
+    rows = rows.map((candidate) => candidate.id === bookmarkId
+      ? { ...candidate, tags: nextTags }
+      : candidate);
+    tagStates = { ...tagStates, [bookmarkId]: { kind: "idle", input, focus: false } };
+    renderReady();
+  }
+
+  async function enqueueTagMutation(bookmarkId: string, operation: () => Promise<void>): Promise<void> {
+    const previous = tagWriteQueues.get(bookmarkId);
+    const current = previous === undefined
+      ? operation()
+      : previous.catch(() => undefined).then(operation);
+    tagWriteQueues.set(bookmarkId, current);
+    try {
+      await current;
+    } finally {
+      if (tagWriteQueues.get(bookmarkId) === current) tagWriteQueues.delete(bookmarkId);
+    }
   }
 
   return {
     bootstrap: async (): Promise<void> => {
       dependencies.render({ kind: "loading" });
       try {
-        rows = await dependencies.loadRows();
-        dependencies.render(
-          rows.length === 0 ? { kind: "empty" } : { kind: "ready", rows, rowStates },
-        );
+        const [loadedRows, assignments] = await Promise.all([dependencies.loadRows(), loadTags()]);
+        rows = loadedRows.map((row) => ({ ...row, tags: assignments[row.id] ?? [] }));
+        if (rows.length === 0) dependencies.render({ kind: "empty" });
+        else renderReady();
       } catch (error: unknown) {
         if (error instanceof Error) {
           dependencies.render({ kind: "error", message: "Bookmarks could not be loaded." });
@@ -48,6 +162,16 @@ export function createLibraryController(
         }
         throw error;
       }
+    },
+    addTag: async (bookmarkId, input): Promise<void> => {
+      await enqueueTagMutation(bookmarkId, () => performAddTag(bookmarkId, input));
+    },
+    removeTag: async (bookmarkId, tagKey): Promise<void> => {
+      await enqueueTagMutation(bookmarkId, () => performRemoveTag(bookmarkId, tagKey));
+    },
+    selectView: (nextView): void => {
+      view = nextView;
+      if (rows.length > 0) renderReady();
     },
     activate: async (event, row): Promise<void> => {
       if (event.nestedInteractive || (event.button !== 0 && event.button !== 1)) return;

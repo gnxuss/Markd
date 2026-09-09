@@ -16,9 +16,9 @@ async function auditManifest(path) {
   if (
     manifest["manifest_version"] !== 3 ||
     manifest["minimum_chrome_version"] !== "90" ||
-    JSON.stringify(manifest["permissions"]) !== JSON.stringify(["bookmarks"])
+    JSON.stringify(manifest["permissions"]) !== JSON.stringify(["bookmarks", "storage"])
   ) {
-    throw new TypeError(`${path} must use MV3, Chrome 90, and exactly the bookmarks permission`);
+    throw new TypeError(`${path} must use MV3, Chrome 90, and exactly the bookmarks and storage permissions`);
   }
   for (const key of forbiddenManifestKeys) {
     if (key in manifest) {

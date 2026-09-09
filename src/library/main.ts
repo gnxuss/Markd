@@ -1,4 +1,5 @@
 import { loadBookmarkRows } from "../bookmarks/chrome-bookmarks.js";
+import { loadTagAssignments, writeBookmarkTags } from "../tags/chrome-tag-storage.js";
 import { createLibraryController } from "./controller.js";
 import { renderLibrary } from "./render.js";
 import type { RenderElement } from "./render.js";
@@ -30,14 +31,29 @@ const elements = {
     setAttribute: (element: RenderElement, name: string, value: string) => {
       if (element instanceof HTMLElement) element.setAttribute(name, value);
     },
+    value: (element: RenderElement) => element instanceof HTMLInputElement ? element.value : "",
+    focus: (element: RenderElement) => {
+      if (element instanceof HTMLElement) queueMicrotask(() => element.focus());
+    },
   },
   status: requiredElement("status"),
   bookmarks: requiredElement("bookmarks"),
+  allView: requiredElement("all-view"),
+  untaggedView: requiredElement("untagged-view"),
+  tagCatalog: requiredElement("tag-catalog"),
 };
 const controller = createLibraryController({
   loadRows: loadBookmarkRows,
-  render: (state) => renderLibrary(state, elements, (event, row) => {
-    void controller.activate(event, row);
-  }),
+  loadTags: loadTagAssignments,
+  writeTags: writeBookmarkTags,
+  render: (state) => renderLibrary(
+    state,
+    elements,
+    (event, row) => { void controller.activate(event, row); },
+    (bookmarkId, input) => { void controller.addTag(bookmarkId, input); },
+    (bookmarkId, tagKey) => { void controller.removeTag(bookmarkId, tagKey); },
+  ),
 });
+elements.allView.addEventListener("click", () => controller.selectView("all"));
+elements.untaggedView.addEventListener("click", () => controller.selectView("untagged"));
 void controller.bootstrap();

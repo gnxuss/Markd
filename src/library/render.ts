@@ -1,6 +1,7 @@
 import { displayUrl } from "../bookmarks/display-url.js";
 import type { BookmarkActivation } from "./controller.js";
-import type { BookmarkRow, LibraryState, RowOpenState } from "../types.js";
+import type { BookmarkRow, LibraryState, RowOpenState, RowTagState, TagRecord } from "../types.js";
+import { createTagEditor } from "./tag-editor.js";
 
 export interface RenderElement {
   className: string;
@@ -14,15 +15,22 @@ export interface RenderDocument {
   append(element: RenderElement, nodes: readonly RenderElement[]): void;
   replaceChildren(element: RenderElement, nodes: readonly RenderElement[]): void;
   setAttribute(element: RenderElement, name: string, value: string): void;
+  value?(element: RenderElement): string;
+  focus?(element: RenderElement): void;
 }
 
 export type LibraryElements = {
   readonly document: RenderDocument;
   readonly status: RenderElement;
   readonly bookmarks: RenderElement;
+  readonly allView?: RenderElement;
+  readonly untaggedView?: RenderElement;
+  readonly tagCatalog?: RenderElement;
 };
 
 export type ActivateBookmark = (event: BookmarkActivation, row: BookmarkRow) => void;
+export type AddTag = (bookmarkId: string, input: string) => void;
+export type RemoveTag = (bookmarkId: string, tagKey: string) => void;
 
 function activationFromEvent(event: Event): BookmarkActivation | undefined {
   if (!(event instanceof MouseEvent)) return undefined;
@@ -44,8 +52,12 @@ function activationFromEvent(event: Event): BookmarkActivation | undefined {
 function createBookmarkRow(
   row: BookmarkRow,
   openState: RowOpenState,
+  tagState: RowTagState,
   elements: LibraryElements,
   activate: ActivateBookmark,
+  addTag: AddTag,
+  removeTag: RemoveTag,
+  catalog: readonly TagRecord[],
 ): RenderElement {
   const item = elements.document.createElement("li");
   item.className = "bookmark-row";
@@ -66,11 +78,15 @@ function createBookmarkRow(
   const url = elements.document.createElement("span");
   url.className = "bookmark-url";
   url.textContent = displayUrl(row.url);
-  const tags = elements.document.createElement("span");
-  tags.className = "bookmark-tags";
-  elements.document.setAttribute(tags, "aria-label", "Tags");
+  const editor = createTagEditor(
+    row,
+    tagState,
+    catalog,
+    elements,
+    { add: addTag, remove: removeTag },
+  );
   elements.document.append(link, [title]);
-  elements.document.append(item, [link, url, tags]);
+  elements.document.append(item, [link, url, editor.tags, editor.form]);
   if (openState.kind === "error") {
     const error = elements.document.createElement("span");
     error.className = "bookmark-error";
@@ -78,6 +94,7 @@ function createBookmarkRow(
     elements.document.setAttribute(error, "role", "status");
     elements.document.append(item, [error]);
   }
+  if (editor.error !== undefined) elements.document.append(item, [editor.error]);
   return item;
 }
 
@@ -85,6 +102,8 @@ export function renderLibrary(
   state: LibraryState,
   elements: LibraryElements,
   activate: ActivateBookmark,
+  addTag: AddTag = () => undefined,
+  removeTag: RemoveTag = () => undefined,
 ): void {
   elements.document.replaceChildren(elements.bookmarks, []);
   elements.status.hidden = false;
@@ -99,13 +118,42 @@ export function renderLibrary(
       elements.status.textContent = state.message;
       return;
     case "ready": {
-      elements.status.textContent = "";
-      elements.status.hidden = true;
+      if (elements.allView !== undefined) {
+        elements.allView.className = state.view === "all" ? "view-control active" : "view-control";
+        elements.document.setAttribute(elements.allView, "aria-current", state.view === "all" ? "page" : "false");
+      }
+      if (elements.untaggedView !== undefined) {
+        elements.untaggedView.className = state.view === "untagged" ? "view-control active" : "view-control";
+        elements.document.setAttribute(elements.untaggedView, "aria-current", state.view === "untagged" ? "page" : "false");
+      }
+      if (elements.tagCatalog !== undefined) {
+        const catalogNodes = state.catalog.length === 0
+          ? (() => {
+              const empty = elements.document.createElement("p");
+              empty.className = "tag-catalog-empty";
+              empty.textContent = "No tags yet";
+              return [empty];
+            })()
+          : state.catalog.map((tag) => {
+              const item = elements.document.createElement("span");
+              item.className = "catalog-tag";
+              item.textContent = `#${tag.label}`;
+              return item;
+            });
+        elements.document.replaceChildren(elements.tagCatalog, catalogNodes);
+      }
+      const emptyUntagged = state.view === "untagged" && state.rows.length === 0;
+      elements.status.textContent = emptyUntagged ? "All bookmarks are tagged." : "";
+      elements.status.hidden = !emptyUntagged;
+      if (emptyUntagged) return;
       const list = elements.document.createElement("ul");
       list.className = "bookmark-list";
       for (const row of state.rows) {
         const openState = state.rowStates[row.id] ?? { kind: "idle" };
-        elements.document.append(list, [createBookmarkRow(row, openState, elements, activate)]);
+        const tagState = state.tagStates[row.id] ?? { kind: "idle", input: "", focus: false };
+        elements.document.append(list, [
+          createBookmarkRow(row, openState, tagState, elements, activate, addTag, removeTag, state.catalog),
+        ]);
       }
       elements.document.append(elements.bookmarks, [list]);
       return;

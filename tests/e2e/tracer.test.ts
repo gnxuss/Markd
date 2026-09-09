@@ -48,7 +48,7 @@ describe("built extension tracer", () => {
       expect(emittedManifest).toMatchObject({
         manifest_version: 3,
         minimum_chrome_version: "90",
-        permissions: ["bookmarks"],
+        permissions: ["bookmarks", "storage"],
       });
       expect(Object.keys(emittedManifest)).not.toContain("host_permissions");
       expect(Object.keys(emittedManifest)).not.toContain("content_scripts");

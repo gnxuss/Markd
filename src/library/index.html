@@ -7,10 +7,22 @@
     <link rel="stylesheet" href="library.css" />
   </head>
   <body>
-    <main>
-      <h1>Markd</h1>
-      <p id="status" role="status">Loading bookmarks…</p>
-      <div id="bookmarks"></div>
+    <main class="app-shell">
+      <aside class="sidebar" aria-label="Library navigation">
+        <h1>Markd</h1>
+        <nav class="view-navigation" aria-label="Bookmark views">
+          <button id="all-view" class="view-control active" type="button" aria-current="page">All</button>
+          <button id="untagged-view" class="view-control" type="button" aria-current="false">Untagged</button>
+        </nav>
+        <section class="tag-catalog-section" aria-labelledby="tags-heading">
+          <h2 id="tags-heading">Tags</h2>
+          <div id="tag-catalog"><p class="tag-catalog-empty">No tags yet</p></div>
+        </section>
+      </aside>
+      <section class="library-panel" aria-label="Bookmarks">
+        <p id="status" role="status">Loading bookmarks…</p>
+        <div id="bookmarks"></div>
+      </section>
     </main>
     <script type="module" src="library.js"></script>
   </body>
