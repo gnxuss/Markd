@@ -24,20 +24,17 @@ describe("live native synchronization built Chromium", () => {
     await page.keyboard.press("Enter");
     await page.waitForSelector(`${first} .tag-chip`);
 
-    const createdId = await fixture.worker.evaluate(async ({ firstBookmarkId, secondBookmarkId }) => {
-      await chrome.bookmarks.update(firstBookmarkId, {
-        title: "First renamed",
-        url: "https://first.example/changed",
-      });
-      await chrome.bookmarks.move(firstBookmarkId, { parentId: "1", index: 1 });
-      const created = await chrome.bookmarks.create({
-        parentId: "1",
-        title: "Created elsewhere",
-        url: "https://created.example/new",
-      });
-      await chrome.bookmarks.remove(secondBookmarkId);
-      return created.id;
-    }, { firstBookmarkId: firstId, secondBookmarkId: secondId });
+    await fixture.native.update(firstId, {
+      title: "First renamed",
+      url: "https://first.example/changed",
+    });
+    await fixture.native.move(firstId, { parentId: "1", index: 1 });
+    const createdId = await fixture.native.create({
+      parentId: "1",
+      title: "Created elsewhere",
+      url: "https://created.example/new",
+    });
+    await fixture.native.remove(secondId);
 
     await page.waitForFunction(
       ({ selector, newId }) => {
