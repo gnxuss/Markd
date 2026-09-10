@@ -12,11 +12,11 @@ Native Chromium bookmarks become easier to organize and find when users can atta
 
 ### Validated
 
-(None yet — ship to validate)
+- ✓ Existing URL-bearing Chromium bookmarks appear in native order without folders, remain distinct by native bookmark ID, and can be opened from Markd with an appropriate empty state — Phase 1
 
 ### Active
 
-- [ ] Automatically display existing and newly created Chromium bookmarks, excluding folders.
+- [ ] Automatically display newly created Chromium bookmarks and reconcile later native changes.
 - [ ] Let users create, reuse, add, and remove multiple tags on any existing bookmark.
 - [ ] Keep tag names trimmed and case-insensitively unique.
 - [ ] Search bookmark titles and URLs/domains with case-insensitive partial matching.
@@ -52,9 +52,9 @@ Markd is a greenfield Chromium extension. The V0.1 product brief is `PRD.md`, wh
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Keep Chromium as the bookmark source of truth | Preserves the user's existing bookmark workflow and avoids a parallel bookmark database | — Pending |
+| Keep Chromium as the bookmark source of truth | Preserves the user's existing bookmark workflow and avoids a parallel bookmark database | ✓ Validated in Phase 1 |
 | Store only Markd metadata locally | Satisfies privacy, persistence, and no-backend requirements | — Pending |
-| Key bookmark-to-tag relationships by native bookmark identity | Preserves distinct duplicate URLs and tags through bookmark property changes | — Pending |
+| Key bookmark-to-tag relationships by native bookmark identity | Preserves distinct duplicate URLs and tags through bookmark property changes | ✓ Native identity validated in Phase 1; tag relationships remain pending |
 
 ## Evolution
 
@@ -74,4 +74,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-08 after initialization*
+*Last updated: 2026-09-08 after Phase 1*
