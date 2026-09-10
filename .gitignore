@@ -2,3 +2,4 @@
 .planning/
 dist/
 node_modules/
+.gsd/
