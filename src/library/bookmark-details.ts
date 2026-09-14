@@ -40,6 +40,7 @@ type BookmarkDetailsDependencies = {
   readonly load: (bookmarkId: string) => Promise<string>;
   readonly write: (bookmarkId: string, note: string) => Promise<void>;
   readonly onState: () => void;
+  readonly onSaved?: (bookmarkId: string, note: string) => void;
 };
 
 function errorMessage(error: unknown, action: "load" | "save"): string {
@@ -95,13 +96,21 @@ export function createBookmarkDetails(
     const current = states.get(bookmarkId);
     if (current?.kind !== "ready" && !(current?.kind === "error" && current.operation === "save")) return;
     const { note, draft } = current;
+    const confirmedNote = draft.trim().slice(0, 280);
     const generation = generations.get(bookmarkId) ?? 0;
     states.set(bookmarkId, { kind: "saving", bookmarkId, note, draft });
     publish();
     try {
-      await dependencies.write(bookmarkId, draft);
+      await dependencies.write(bookmarkId, confirmedNote);
       if (!isCurrent(bookmarkId, generation)) return;
-      states.set(bookmarkId, { kind: "ready", bookmarkId, note: draft, draft, message: "Note saved." });
+      states.set(bookmarkId, {
+        kind: "ready",
+        bookmarkId,
+        note: confirmedNote,
+        draft: confirmedNote,
+        message: "Note saved.",
+      });
+      dependencies.onSaved?.(bookmarkId, confirmedNote);
     } catch (error: unknown) {
       if (!isCurrent(bookmarkId, generation)) return;
       states.set(bookmarkId, {

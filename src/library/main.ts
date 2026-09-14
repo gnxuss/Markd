@@ -1,6 +1,6 @@
 import { loadBookmarkRows } from "../bookmarks/chrome-bookmarks.js";
 import { loadTagAssignments, writeBookmarkTags } from "../tags/chrome-tag-storage.js";
-import { loadBookmarkNote, writeBookmarkNote } from "../quick-save/metadata-storage.js";
+import { loadBookmarkNote, loadBookmarkNotes, writeBookmarkNote } from "../quick-save/metadata-storage.js";
 import { subscribeBookmarkLifecycle } from "./bookmark-lifecycle.js";
 import { createBookmarkDetails } from "./bookmark-details.js";
 import { createLibraryController } from "./controller.js";
@@ -55,19 +55,21 @@ const elements = {
 };
 let renderer: ReturnType<typeof createLibraryRenderer>;
 let latestState: LibraryState = { kind: "loading" };
-const details = createBookmarkDetails({
-  load: loadBookmarkNote,
-  write: writeBookmarkNote,
-  onState: () => renderer.render(latestState),
-});
 const controller = createLibraryController({
   loadRows: loadBookmarkRows,
   loadTags: loadTagAssignments,
+  loadNotes: loadBookmarkNotes,
   writeTags: writeBookmarkTags,
   render: (state) => {
     latestState = state;
     renderer.render(state);
   },
+});
+const details = createBookmarkDetails({
+  load: loadBookmarkNote,
+  write: writeBookmarkNote,
+  onState: () => renderer.render(latestState),
+  onSaved: controller.updateNote,
 });
 renderer = createLibraryRenderer(
   elements,

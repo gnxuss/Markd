@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   bookmarkIdFromNoteKey,
   listBookmarkNoteIds,
+  loadBookmarkNotes,
   loadBookmarkNote,
   loadRecentTags,
   removeBookmarkNotes,
@@ -68,5 +69,24 @@ describe("Quick Save metadata storage", () => {
     expect(ids).toEqual(["first", "second"]);
     expect(bookmarkIdFromNoteKey("bookmark-note:1:first")).toBe("first");
     expect(remove).toHaveBeenCalledWith(["bookmark-note:1:first", "bookmark-note:1:second"]);
+  });
+
+  it("loads valid notes for exact non-empty bookmark IDs in one batch", async () => {
+    const get = vi.fn(async () => ({
+      "bookmark-note:1:first": { version: 1, note: "  First context  " },
+      "bookmark-note:1:second": { version: 2, note: "future" },
+      "bookmark-note:1:third": { version: 1, note: "x".repeat(281) },
+    }));
+    vi.stubGlobal("chrome", { storage: { local: { get } } });
+
+    const notes = await loadBookmarkNotes(["first", "", "second", "first", "third"]);
+
+    expect(notes).toEqual({ first: "First context" });
+    expect(get).toHaveBeenCalledOnce();
+    expect(get).toHaveBeenCalledWith([
+      "bookmark-note:1:first",
+      "bookmark-note:1:second",
+      "bookmark-note:1:third",
+    ]);
   });
 });

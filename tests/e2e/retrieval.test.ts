@@ -10,6 +10,35 @@ afterEach(async () => {
 });
 
 describe("unified retrieval built Chromium", () => {
+  it("searches tags, notes, and every folder in a nested path", async () => {
+    fixture = await launchExtension([
+      { kind: "folder", title: "Work", children: [
+        { kind: "folder", title: "Research", children: [
+          { kind: "folder", title: "Papers", children: [
+            { kind: "bookmark", key: "nested", title: "Opaque", url: "https://plain.example/item" },
+          ] },
+        ] },
+      ] },
+      { kind: "bookmark", key: "noted", title: "Unrelated", url: "https://plain.example/note" },
+    ]);
+    const nestedId = fixture.bookmarks["nested"]?.id;
+    const notedId = fixture.bookmarks["noted"]?.id;
+    if (nestedId === undefined || notedId === undefined) throw new TypeError("Seeded bookmarks unavailable");
+    await fixture.worker.evaluate(async (id) => chrome.storage.local.set({
+      [`bookmark-note:1:${id}`]: { version: 1, note: "Needle context" },
+    }), notedId);
+    const page = await fixture.openLibrary();
+
+    for (const query of ["work", "research", "papers", "Work / Research / Papers"] as const) {
+      await page.click("#bookmark-search", { count: 3 });
+      await page.type("#bookmark-search", query);
+      expect(await page.$(`[data-bookmark-id="${nestedId}"]`)).not.toBeNull();
+    }
+    await page.click("#bookmark-search", { count: 3 });
+    await page.type("#bookmark-search", "needle context");
+    expect(await page.$(`[data-bookmark-id="${notedId}"]`)).not.toBeNull();
+  }, 30_000);
+
   it("searches title and URL, filters by one confirmed tag, and keeps editing usable", async () => {
     fixture = await launchExtension([
       { kind: "bookmark", key: "alpha", title: "Alpha Handbook", url: "https://docs.example.com/guide" },

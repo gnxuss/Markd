@@ -8,7 +8,9 @@ export function selectRows(
   const query = criteria.query.trim().toLocaleLowerCase();
   return rows.filter((row) => {
     if (view === "untagged" && row.tags.length > 0) return false;
-    if (query.length > 0 && !`${row.title}\n${row.url}`.toLocaleLowerCase().includes(query)) return false;
+    const searchable = row.searchText
+      ?? `${row.title}\n${row.url}\n${row.folderPath ?? ""}\n${row.tags.map((tag) => `${tag.label}\n${tag.key}`).join("\n")}\n${row.note ?? ""}`.toLocaleLowerCase();
+    if (query.length > 0 && !searchable.includes(query)) return false;
     return criteria.selectedTagKeys.every((key) => row.tags.some((tag) => tag.key === key));
   });
 }

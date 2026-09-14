@@ -1,4 +1,4 @@
-import type { TagRecord } from "../types.js";
+import type { NoteAssignments, TagRecord } from "../types.js";
 import { parseTagInput } from "../tags/canonicalize.js";
 
 const NOTE_PREFIX = "bookmark-note:1:";
@@ -68,6 +68,22 @@ export async function loadBookmarkNote(bookmarkId: string): Promise<string> {
   if (!isRecord(value) || value["version"] !== 1 || typeof value["note"] !== "string") return "";
   const note = value["note"].trim();
   return note.length <= MAX_NOTE_LENGTH ? note : "";
+}
+
+export async function loadBookmarkNotes(bookmarkIds: readonly string[]): Promise<NoteAssignments> {
+  const ids = [...new Set(bookmarkIds)].filter((bookmarkId) => bookmarkId.length > 0);
+  if (ids.length === 0) return {};
+  const keys = ids.map((bookmarkId) => `${NOTE_PREFIX}${bookmarkId}`);
+  const stored: unknown = await chrome.storage.local.get(keys);
+  if (!isRecord(stored)) return {};
+  const notes: Record<string, string> = {};
+  for (const id of ids) {
+    const value = stored[`${NOTE_PREFIX}${id}`];
+    if (!isRecord(value) || value["version"] !== 1 || typeof value["note"] !== "string") continue;
+    const note = value["note"].trim();
+    if (note.length > 0 && note.length <= MAX_NOTE_LENGTH) notes[id] = note;
+  }
+  return notes;
 }
 
 export async function writeBookmarkNote(bookmarkId: string, input: string): Promise<void> {

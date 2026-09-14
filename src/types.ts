@@ -4,6 +4,7 @@ export type TagRecord = {
 };
 
 export type TagAssignments = Readonly<Record<string, readonly TagRecord[]>>;
+export type NoteAssignments = Readonly<Record<string, string>>;
 export type LibraryView = "all" | "untagged";
 export type RetrievalCriteria = {
   readonly query: string;
@@ -15,6 +16,9 @@ export type BookmarkRow = {
   readonly title: string;
   readonly url: string;
   readonly tags: readonly TagRecord[];
+  readonly folderPath?: string;
+  readonly note?: string;
+  readonly searchText?: string;
 };
 
 export type RowOpenState =

@@ -28,12 +28,20 @@ describe("flattenBookmarks", () => {
       title: "Second",
       url: "https://duplicate.example/item",
       tags: [],
+      folderPath: "",
     });
     expect(projectedRows).toContainEqual({
       id: "duplicate",
       title: "Duplicate",
       url: "https://duplicate.example/item",
       tags: [],
+      folderPath: "Nested / Deep",
     });
+  });
+
+  it("projects every named ancestor folder without including the synthetic root", () => {
+    const projectedRows = flattenBookmarks(phaseOneBookmarkTree);
+    expect(projectedRows.find((row) => row.id === "duplicate")?.folderPath).toBe("Nested / Deep");
+    expect(projectedRows.find((row) => row.id === "first")?.folderPath).toBe("");
   });
 });

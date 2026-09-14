@@ -6,11 +6,13 @@ import type {
   RowOpenState,
   RowTagState,
   RetrievalCriteria,
+  NoteAssignments,
   TagAssignments,
   TagRecord,
   LibraryView,
 } from "../types.js";
 import { confirmedTagCatalog, selectRows } from "./selectors.js";
+import { enrichBookmarkRow } from "./search-index.js";
 
 export type BookmarkActivation = {
   readonly button: number;
@@ -23,6 +25,7 @@ export type BookmarkActivation = {
 type LibraryControllerDependencies = {
   readonly loadRows: () => Promise<readonly BookmarkRow[]>;
   readonly loadTags?: (bookmarkIds: readonly string[]) => Promise<TagAssignments>;
+  readonly loadNotes?: (bookmarkIds: readonly string[]) => Promise<NoteAssignments>;
   readonly writeTags?: (bookmarkId: string, tags: readonly TagRecord[]) => Promise<void>;
   readonly open?: (url: string, background: boolean) => Promise<void>;
   readonly render: (state: LibraryState) => void;
@@ -38,6 +41,7 @@ export type LibraryController = {
   readonly selectView: (view: LibraryView) => void;
   readonly setSearch: (query: string) => void;
   readonly toggleTagFilter: (tagKey: string) => void;
+  readonly updateNote: (bookmarkId: string, note: string) => void;
 };
 
 export function createLibraryController(
@@ -50,6 +54,7 @@ export function createLibraryController(
   let criteria: RetrievalCriteria = { query: "", selectedTagKeys: [] };
   const open = dependencies.open ?? openBookmark;
   const loadTags = dependencies.loadTags ?? (async (): Promise<TagAssignments> => ({}));
+  const loadNotes = dependencies.loadNotes ?? (async (): Promise<NoteAssignments> => ({}));
   const writeTags = dependencies.writeTags ?? (async () => undefined);
   const schedule = dependencies.schedule ?? ((callback, duration) => window.setTimeout(callback, duration));
   const tagWriteQueues = new Map<string, Promise<void>>();
@@ -57,9 +62,14 @@ export function createLibraryController(
   async function refresh(): Promise<void> {
     try {
       const loadedRows = await dependencies.loadRows();
-      const assignments = await loadTags(loadedRows.map((row) => row.id));
+      const ids = loadedRows.map((row) => row.id);
+      const [assignments, notes] = await Promise.all([loadTags(ids), loadNotes(ids)]);
       const liveIds = new Set(loadedRows.map((row) => row.id));
-      rows = loadedRows.map((row) => ({ ...row, tags: assignments[row.id] ?? [] }));
+      rows = loadedRows.map((row) => enrichBookmarkRow(
+        row,
+        assignments[row.id] ?? [],
+        notes[row.id] ?? "",
+      ));
       rowStates = Object.fromEntries(Object.entries(rowStates).filter(([id]) => liveIds.has(id)));
       tagStates = Object.fromEntries(Object.entries(tagStates).filter(([id]) => liveIds.has(id)));
       if (rows.length === 0) dependencies.render({ kind: "empty" });
@@ -131,7 +141,7 @@ export function createLibraryController(
       throw error;
     }
     rows = rows.map((candidate) => candidate.id === bookmarkId
-      ? { ...candidate, tags: nextTags }
+      ? enrichBookmarkRow(candidate, nextTags, candidate.note ?? "")
       : candidate);
     tagStates = { ...tagStates, [bookmarkId]: { kind: "idle", input: "", focus: true } };
     renderReady();
@@ -160,7 +170,7 @@ export function createLibraryController(
       throw error;
     }
     rows = rows.map((candidate) => candidate.id === bookmarkId
-      ? { ...candidate, tags: nextTags }
+      ? enrichBookmarkRow(candidate, nextTags, candidate.note ?? "")
       : candidate);
     tagStates = { ...tagStates, [bookmarkId]: { kind: "idle", input, focus: false } };
     renderReady();
@@ -205,6 +215,12 @@ export function createLibraryController(
         ? criteria.selectedTagKeys.filter((key) => key !== tagKey)
         : [...criteria.selectedTagKeys, tagKey];
       criteria = { ...criteria, selectedTagKeys };
+      if (rows.length > 0) renderReady();
+    },
+    updateNote: (bookmarkId, note): void => {
+      rows = rows.map((row) => row.id === bookmarkId
+        ? enrichBookmarkRow(row, row.tags, note)
+        : row);
       if (rows.length > 0) renderReady();
     },
     activate: async (event, row): Promise<void> => {

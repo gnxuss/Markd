@@ -12,18 +12,24 @@ const rows = [
     title: "Alpha Handbook",
     url: "https://docs.example.com/Guide/Start",
     tags: [design, research],
+    folderPath: "Work / Papers",
+    note: "Primary reading list",
   },
   {
     id: "native-beta",
     title: "beta notes",
     url: "https://research.example.org/archive",
     tags: [design],
+    folderPath: "Archive",
+    note: "",
   },
   {
     id: "native-gamma",
     title: "Gamma",
     url: "https://other.example.net/path",
     tags: [],
+    folderPath: "Personal",
+    note: "Remember this later",
   },
 ] satisfies readonly BookmarkRow[];
 
@@ -37,6 +43,11 @@ describe("retrieval selection", () => {
     ["  ALPHA  ", ["native-alpha"]],
     ["EXAMPLE.ORG/ARCH", ["native-beta"]],
     ["docs.example", ["native-alpha"]],
+    ["work", ["native-alpha"]],
+    ["papers", ["native-alpha"]],
+    ["primary reading", ["native-alpha"]],
+    ["research", ["native-alpha", "native-beta"]],
+    ["remember this", ["native-gamma"]],
   ])("matches trimmed case-insensitive title or raw URL query %s", (query, expectedIds) => {
     expect(selectRows(rows, "all", { query, selectedTagKeys: [] }).map((row) => row.id)).toEqual(expectedIds);
   });
