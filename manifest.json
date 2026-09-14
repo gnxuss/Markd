@@ -3,9 +3,16 @@
   "name": "Markd",
   "version": "0.1.0",
   "minimum_chrome_version": "90",
-  "permissions": ["bookmarks", "storage"],
+  "permissions": ["bookmarks", "storage", "activeTab"],
   "action": {
-    "default_title": "Open Markd"
+    "default_title": "Quick Save with Markd",
+    "default_popup": "quick-save.html"
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": { "default": "Ctrl+Shift+Period", "mac": "Command+Shift+Period" },
+      "description": "Open Quick Save"
+    }
   },
   "background": {
     "service_worker": "background.js",

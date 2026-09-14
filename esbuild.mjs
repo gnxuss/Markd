@@ -16,9 +16,9 @@ async function auditManifest(path) {
   if (
     manifest["manifest_version"] !== 3 ||
     manifest["minimum_chrome_version"] !== "90" ||
-    JSON.stringify(manifest["permissions"]) !== JSON.stringify(["bookmarks", "storage"])
+    JSON.stringify(manifest["permissions"]) !== JSON.stringify(["bookmarks", "storage", "activeTab"])
   ) {
-    throw new TypeError(`${path} must use MV3, Chrome 90, and exactly the bookmarks and storage permissions`);
+    throw new TypeError(`${path} must use MV3, Chrome 90, and exactly the bookmarks, storage, and activeTab permissions`);
   }
   for (const key of forbiddenManifestKeys) {
     if (key in manifest) {
@@ -38,6 +38,7 @@ if (!process.argv.includes("--check")) {
     entryPoints: {
       background: "src/background.ts",
       library: "src/library/main.ts",
+      "quick-save": "src/quick-save/main.ts",
     },
     format: "esm",
     outdir: "dist",
@@ -48,6 +49,8 @@ if (!process.argv.includes("--check")) {
     cp("manifest.json", "dist/manifest.json"),
     cp("src/library/index.html", "dist/library.html"),
     cp("src/library/styles.css", "dist/library.css"),
+    cp("src/quick-save/index.html", "dist/quick-save.html"),
+    cp("src/quick-save/styles.css", "dist/quick-save.css"),
   ]);
   await auditManifest("dist/manifest.json");
 }

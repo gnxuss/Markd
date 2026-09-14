@@ -1,0 +1,22 @@
+:root { color-scheme: light; font-family: system-ui, sans-serif; background: #f7f7f5; color: #20201e; }
+body { width: 360px; margin: 0; }
+main { padding: 1rem; }
+header { display: flex; align-items: baseline; gap: 0.6rem; border-bottom: 1px solid #deded8; }
+header span { color: #315efb; font-size: 0.68rem; font-weight: 750; letter-spacing: 0.14em; }
+h1 { margin: 0 0 0.75rem; font-family: Georgia, serif; font-size: 1.35rem; letter-spacing: -0.035em; }
+#page-title { margin: 0.9rem 0 0.2rem; overflow: hidden; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+#page-url { margin: 0 0 0.9rem; overflow: hidden; color: #66665f; font-size: 0.78rem; text-overflow: ellipsis; white-space: nowrap; }
+form { display: grid; gap: 0.45rem; }
+label { color: #515149; font-size: 0.75rem; font-weight: 700; }
+input, select, button { border-radius: 0.45rem; font: inherit; }
+input, select { min-width: 0; padding: 0.52rem 0.58rem; border: 1px solid #c9c9c1; background: #fff; color: inherit; }
+.tag-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.4rem; }
+button { padding: 0.52rem 0.72rem; border: 0; background: #315efb; color: #fff; cursor: pointer; }
+#add-tag { border: 1px solid #c9c9c1; background: #fff; color: #20201e; }
+#selected-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.tag-chip { display: inline-flex; align-items: center; gap: 0.2rem; padding: 0.2rem 0.25rem 0.2rem 0.45rem; border-radius: 999px; background: #e7e9ff; color: #253682; font-size: 0.76rem; }
+.tag-chip button { padding: 0.05rem 0.25rem; background: transparent; color: inherit; }
+:focus-visible { outline: 3px solid #315efb; outline-offset: 2px; }
+[aria-busy="true"] { opacity: 0.65; }
+#status { min-height: 1.2rem; margin: 0.7rem 0 0; color: #66665f; font-size: 0.78rem; }
+#status.error { color: #a62525; }

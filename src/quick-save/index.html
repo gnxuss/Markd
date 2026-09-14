@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Quick Save · Markd</title>
+    <link rel="stylesheet" href="quick-save.css" />
+  </head>
+  <body>
+    <main>
+      <header><span>MARKD</span><h1>Quick Save</h1></header>
+      <section id="content" aria-busy="true">
+        <p id="page-title">Loading current page…</p>
+        <p id="page-url"></p>
+        <form id="save-form">
+          <label for="folder">Folder</label><select id="folder" required></select>
+          <label for="tag-input">Tags</label>
+          <div id="selected-tags" aria-label="Selected tags"></div>
+          <div class="tag-entry"><input id="tag-input" autocomplete="off" /><button id="add-tag" type="button">Add</button></div>
+          <button id="save" type="submit">Save</button>
+        </form>
+      </section>
+      <p id="status" role="status" aria-live="polite"></p>
+    </main>
+    <script type="module" src="quick-save.js"></script>
+  </body>
+</html>
