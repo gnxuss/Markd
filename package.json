@@ -6,7 +6,7 @@
   "scripts": {
     "build": "node esbuild.mjs",
     "check": "tsc --noEmit && node esbuild.mjs --check",
-    "test": "vitest run",
+    "test": "vitest run --maxWorkers=1",
     "test:e2e": "vitest run tests/e2e --maxWorkers=1"
   },
   "devDependencies": {

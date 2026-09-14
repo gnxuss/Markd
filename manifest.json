@@ -12,6 +12,10 @@
     "_execute_action": {
       "suggested_key": { "default": "Ctrl+Shift+Period", "mac": "Command+Shift+Period" },
       "description": "Open Quick Save"
+    },
+    "open-library": {
+      "suggested_key": { "default": "Ctrl+Shift+L", "mac": "Command+Shift+L" },
+      "description": "Open Markd library"
     }
   },
   "background": {

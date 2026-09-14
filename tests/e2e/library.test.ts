@@ -81,7 +81,7 @@ describe("empty-library built Chromium", () => {
 });
 
 describe("permission-audit emitted package", () => {
-  it("requests exactly the Phase 2 browser authority", async () => {
+  it("requests exactly the current local-only browser authority", async () => {
     fixture = await launchExtension([]);
     const manifest: unknown = await fixture.worker.evaluate(async () => {
       const response = await fetch(chrome.runtime.getURL("manifest.json"));
@@ -92,8 +92,18 @@ describe("permission-audit emitted package", () => {
       name: "Markd",
       version: "0.1.0",
       minimum_chrome_version: "90",
-      permissions: ["bookmarks", "storage"],
-      action: { default_title: "Open Markd" },
+      permissions: ["bookmarks", "storage", "activeTab"],
+      action: { default_title: "Quick Save with Markd", default_popup: "quick-save.html" },
+      commands: {
+        "_execute_action": {
+          suggested_key: { default: "Ctrl+Shift+Period", mac: "Command+Shift+Period" },
+          description: "Open Quick Save",
+        },
+        "open-library": {
+          suggested_key: { default: "Ctrl+Shift+L", mac: "Command+Shift+L" },
+          description: "Open Markd library",
+        },
+      },
       background: { service_worker: "background.js", type: "module" },
     });
   });

@@ -14,20 +14,22 @@ async function typeScriptFiles(directory: string): Promise<readonly string[]> {
 }
 
 describe("native bookmark authority", () => {
-  it("keeps every production bookmark API call read or observe only", async () => {
+  it("keeps native bookmark mutation limited to Quick Save creation", async () => {
     const files = await typeScriptFiles("src");
     const sources = await Promise.all(files.map(async (file) => [file, await readFile(file, "utf8")] as const));
     const forbidden = /chrome\.bookmarks\.(?:create|update|move|remove|removeTree)\s*\(/;
 
-    expect(sources.filter(([, source]) => forbidden.test(source)).map(([file]) => file)).toEqual([]);
+    expect(sources.filter(([, source]) => forbidden.test(source)).map(([file]) => file)).toEqual([
+      "src/quick-save/main.ts",
+    ]);
   });
 
-  it("ships exactly bookmarks and storage authority", async () => {
+  it("ships exactly bookmarks, storage, and active-tab authority", async () => {
     const sourceManifest: unknown = JSON.parse(await readFile("manifest.json", "utf8"));
     const emittedManifest: unknown = JSON.parse(await readFile("dist/manifest.json", "utf8"));
 
     for (const manifest of [sourceManifest, emittedManifest]) {
-      expect(manifest).toMatchObject({ permissions: ["bookmarks", "storage"] });
+      expect(manifest).toMatchObject({ permissions: ["bookmarks", "storage", "activeTab"] });
       expect(manifest).not.toHaveProperty("host_permissions");
       expect(manifest).not.toHaveProperty("content_scripts");
     }

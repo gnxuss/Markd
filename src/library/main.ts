@@ -65,6 +65,9 @@ elements.search.addEventListener("input", (event) => {
 });
 const lifecycle = subscribeBookmarkLifecycle(chrome.bookmarks, controller.refresh);
 void lifecycle.start();
+if (new URLSearchParams(location.search).get("focus") === "search") {
+  elements.search.focus();
+}
 let disposed = false;
 window.addEventListener("pagehide", () => {
   if (disposed) return;

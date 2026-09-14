@@ -41,13 +41,13 @@ describe("durable add-tag built Chromium", () => {
     });
   }, 30_000);
 
-  it("emits only bookmarks and storage permissions", async () => {
+  it("emits only bookmarks, storage, and activeTab permissions", async () => {
     fixture = await launchExtension([]);
     const manifest = await fixture.worker.evaluate(async () => {
       const response = await fetch(chrome.runtime.getURL("manifest.json"));
       return response.json();
     });
-    expect(manifest).toMatchObject({ permissions: ["bookmarks", "storage"] });
+    expect(manifest).toMatchObject({ permissions: ["bookmarks", "storage", "activeTab"] });
     expect(manifest).not.toHaveProperty("host_permissions");
     expect(manifest).not.toHaveProperty("content_scripts");
   }, 30_000);

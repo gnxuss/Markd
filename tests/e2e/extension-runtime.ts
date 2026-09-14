@@ -90,17 +90,12 @@ export async function launchExtensionRuntime(
     },
     restartWorker: async (libraryUrl): Promise<void> => {
       await activeWorker.close();
-      const extension = [...(await activeBrowser.extensions()).values()].find(
-        (candidate) => candidate.name === "Markd",
-      );
-      if (extension === undefined) throw new TypeError("The built Markd extension was not loaded");
-      const actionPage = await activeBrowser.newPage();
-      await extension.triggerAction(actionPage);
-      const libraryTarget = await activeBrowser.waitForTarget((candidate) => candidate.url() === libraryUrl);
-      const openedLibrary = await libraryTarget.page();
-      await openedLibrary?.close();
-      if (!actionPage.isClosed()) await actionPage.close();
+      const wakePage = await activeBrowser.newPage();
+      await wakePage.goto(libraryUrl);
+      await wakePage.evaluate(async () => chrome.storage.local.set({ "markd-test-wake": Date.now() }));
       activeWorker = await findExtensionWorker(activeBrowser, "Markd", options.distinguishExtension);
+      await wakePage.evaluate(async () => chrome.storage.local.remove("markd-test-wake"));
+      await wakePage.close();
     },
     restartBrowser: async (): Promise<void> => {
       await activeBrowser.close();

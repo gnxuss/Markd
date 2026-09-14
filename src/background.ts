@@ -4,6 +4,8 @@ import {
   reconcileStaleMetadata,
 } from "./bookmarks/metadata-reconciliation.js";
 import { bookmarkIdFromAssignmentKey } from "./tags/chrome-tag-storage.js";
+import { bookmarkIdFromNoteKey } from "./quick-save/metadata-storage.js";
+import { dispatchExtensionCommand } from "./commands.js";
 
 let reconciliationPending = false;
 let activeReconciliation: Promise<void> | undefined;
@@ -48,9 +50,11 @@ function queueChangedReconciliation(bookmarkIds: readonly string[]): Promise<voi
   return activeChangedReconciliation;
 }
 
-chrome.action.onClicked.addListener(() => {
-  const libraryUrl = chrome.runtime.getURL("library.html");
-  void chrome.tabs.create({ active: true, url: libraryUrl });
+chrome.commands.onCommand.addListener((command) => {
+  dispatchExtensionCommand(command, () => {
+    const libraryUrl = chrome.runtime.getURL("library.html?focus=search");
+    void chrome.tabs.create({ active: true, url: libraryUrl });
+  });
 });
 
 chrome.bookmarks.onRemoved.addListener((_id, removeInfo) => {
@@ -72,7 +76,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== "local") return;
   const changedIds = Object.entries(changes).flatMap(([storageKey, change]) => {
     if (change.newValue === undefined) return [];
-    const bookmarkId = bookmarkIdFromAssignmentKey(storageKey);
+    const bookmarkId = bookmarkIdFromAssignmentKey(storageKey) ?? bookmarkIdFromNoteKey(storageKey);
     return bookmarkId === undefined ? [] : [bookmarkId];
   });
   if (changedIds.length === 0) return;

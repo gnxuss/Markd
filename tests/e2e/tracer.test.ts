@@ -48,7 +48,7 @@ describe("built extension tracer", () => {
       expect(emittedManifest).toMatchObject({
         manifest_version: 3,
         minimum_chrome_version: "90",
-        permissions: ["bookmarks", "storage"],
+        permissions: ["bookmarks", "storage", "activeTab"],
       });
       expect(Object.keys(emittedManifest)).not.toContain("host_permissions");
       expect(Object.keys(emittedManifest)).not.toContain("content_scripts");
@@ -57,21 +57,10 @@ describe("built extension tracer", () => {
         { title: bookmarkTitle, url: bookmarkUrl },
       );
 
-      // When: the toolbar action is triggered and its rendered bookmark row is activated.
+      // When: the packaged library is opened and its rendered bookmark row is activated.
       const libraryUrl = await worker.evaluate(() => chrome.runtime.getURL("library.html"));
-      const extension = [...(await browser.extensions()).values()].find(
-        (candidate) => candidate.name === "Markd",
-      );
-      if (extension === undefined) {
-        throw new TypeError("The built Markd extension was not loaded");
-      }
-      const actionPage = await browser.newPage();
-      await extension.triggerAction(actionPage);
-      const libraryTarget = await browser.waitForTarget((candidate) => candidate.url() === libraryUrl);
-      const libraryPage = await libraryTarget.page();
-      if (libraryPage === null) {
-        throw new TypeError("The toolbar action did not create a library page");
-      }
+      const libraryPage = await browser.newPage();
+      await libraryPage.goto(libraryUrl);
       await libraryPage.bringToFront();
       const bookmark = await libraryPage.waitForSelector("a");
       if (bookmark === null) {
