@@ -32,6 +32,9 @@ const elements = {
         element.replaceChildren(...nodes);
       }
     },
+    remove: (element: RenderElement) => {
+      if (element instanceof HTMLElement) element.remove();
+    },
     setAttribute: (element: RenderElement, name: string, value: string) => {
       if (element instanceof HTMLElement) element.setAttribute(name, value);
     },

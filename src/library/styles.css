@@ -37,8 +37,10 @@ body { margin: 0; }
 .bookmark-link::after { position: absolute; inset: 0; content: ""; }
 .bookmark-link:focus-visible { outline: none; }
 .bookmark-row:has(.bookmark-link:focus-visible) { outline: 3px solid #315efb; outline-offset: -3px; }
+.details-toggle { position: absolute; top: 0.62rem; right: 0.72rem; z-index: 2; padding: 0.22rem 0.4rem; border: 1px solid #c9c9c1; border-radius: 0.38rem; background: #fff; color: #515149; font: inherit; font-size: 0.72rem; cursor: pointer; }
+.details-toggle:hover { border-color: #aeb7f0; color: #253682; }
 .bookmark-title, .bookmark-url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bookmark-title { font-size: 0.95rem; font-weight: 650; }
+.bookmark-title { display: block; padding-right: 4.4rem; font-size: 0.95rem; font-weight: 650; }
 .bookmark-url { color: #66665f; font-size: 0.8rem; }
 .bookmark-tags { position: relative; z-index: 2; min-height: 0.25rem; overflow-x: auto; white-space: nowrap; }
 .tag-chip { display: inline-flex; align-items: center; gap: 0.18rem; margin-right: 0.35rem; padding: 0.12rem 0.2rem 0.12rem 0.42rem; border-radius: 999px; background: #e7e9ff; color: #253682; font-size: 0.76rem; }
@@ -51,7 +53,14 @@ body { margin: 0; }
 .tag-suggestions:empty { display: none; }
 .tag-suggestion { padding: 0.48rem 0.58rem; border: 0; background: #fff; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .tag-suggestion:hover, .tag-suggestion:focus-visible { background: #f0f1eb; }
-.catalog-tag:focus-visible, #bookmark-search:focus-visible, .tag-input:focus-visible, .tag-submit:focus-visible, .tag-remove:focus-visible, .tag-suggestion:focus-visible, .pagination-button:focus-visible { outline: 3px solid #315efb; outline-offset: 2px; }
+.bookmark-details { position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.38rem 0.55rem; max-width: 30rem; margin-top: 0.35rem; padding: 0.62rem; border: 1px solid #deded8; border-radius: 0.5rem; background: #fafaf7; }
+.bookmark-details label { color: #515149; font-size: 0.75rem; font-weight: 650; }
+.note-status { grid-column: 1 / -1; min-height: 1rem; margin: 0; color: #77776f; font-size: 0.76rem; }
+.note-status.error { color: #a62525; }
+.bookmark-note { grid-column: 1 / -1; min-width: 0; padding: 0.48rem 0.55rem; border: 1px solid #c9c9c1; border-radius: 0.42rem; background: #fff; color: inherit; font: inherit; resize: vertical; }
+.note-save, .note-retry { justify-self: start; padding: 0.35rem 0.62rem; border: 0; border-radius: 0.38rem; background: #315efb; color: #fff; font: inherit; font-size: 0.78rem; cursor: pointer; }
+.note-save:disabled { cursor: default; opacity: 0.62; }
+.catalog-tag:focus-visible, #bookmark-search:focus-visible, .tag-input:focus-visible, .tag-submit:focus-visible, .tag-remove:focus-visible, .tag-suggestion:focus-visible, .pagination-button:focus-visible, .details-toggle:focus-visible, .bookmark-note:focus-visible, .note-save:focus-visible, .note-retry:focus-visible { outline: 3px solid #315efb; outline-offset: 2px; }
 [aria-busy="true"] { opacity: 0.65; }
 .bookmark-error, .tag-error { color: #a62525; font-size: 0.78rem; }
 @media (max-width: 42rem) {

@@ -36,6 +36,7 @@ function appendNoteEditor(
   panel.className = "bookmark-details";
   elements.document.setAttribute(panel, "id", `bookmark-details-${row.id}`);
   elements.document.setAttribute(panel, "aria-label", `Note for ${row.title || "Untitled bookmark"}`);
+  elements.document.setAttribute(panel, "aria-busy", String(state.kind === "loading" || state.kind === "saving"));
   if (state.kind === "loading") {
     panel.textContent = "Loading note…";
     elements.document.setAttribute(panel, "role", "status");
@@ -79,6 +80,7 @@ function appendNoteEditor(
   save.textContent = state.kind === "saving" ? "Saving…" : "Save note";
   elements.document.setAttribute(save, "type", "button");
   elements.document.setAttribute(save, "aria-disabled", String(state.kind === "saving"));
+  if (state.kind === "saving") elements.document.setAttribute(save, "disabled", "");
   elements.document.addEventListener(save, "click", (event) => {
     event.preventDefault();
     event.stopPropagation();

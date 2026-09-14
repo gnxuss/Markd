@@ -15,6 +15,7 @@ export interface RenderDocument {
   addEventListener(element: RenderElement, type: string, listener: (event: Event) => void): void;
   append(element: RenderElement, nodes: readonly RenderElement[]): void;
   replaceChildren(element: RenderElement, nodes: readonly RenderElement[]): void;
+  remove?(element: RenderElement): void;
   setAttribute(element: RenderElement, name: string, value: string): void;
   value?(element: RenderElement): string;
   setValue?(element: RenderElement, value: string): void;

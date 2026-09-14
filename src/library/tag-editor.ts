@@ -74,9 +74,11 @@ export function createTagEditor(
   const options = elements.document.createElement("div");
   options.className = "tag-suggestions";
   elements.document.setAttribute(options, "role", "listbox");
+  let optionsMounted = false;
 
   const renderOptions = (inputValue: string): void => {
-    const optionNodes = tagSuggestions(inputValue, catalog).map((suggestion) => {
+    const suggestions = tagSuggestions(inputValue, catalog);
+    const optionNodes = suggestions.map((suggestion) => {
       const option = elements.document.createElement("button");
       option.className = "tag-suggestion";
       elements.document.setAttribute(option, "type", "button");
@@ -91,6 +93,13 @@ export function createTagEditor(
       return option;
     });
     elements.document.replaceChildren(options, optionNodes);
+    if (suggestions.length > 0 && !optionsMounted) {
+      elements.document.append(form, [options]);
+      optionsMounted = true;
+    } else if (suggestions.length === 0 && optionsMounted) {
+      elements.document.remove?.(options);
+      optionsMounted = false;
+    }
   };
 
   elements.document.addEventListener(input, "input", () => {
@@ -111,7 +120,7 @@ export function createTagEditor(
   submit.className = "tag-submit";
   submit.textContent = "Add";
   elements.document.setAttribute(submit, "type", "submit");
-  elements.document.append(form, [input, submit, options]);
+  elements.document.append(form, [input, submit]);
   renderOptions(tagState.input);
   if (tagState.focus) elements.document.focus?.(input);
 
