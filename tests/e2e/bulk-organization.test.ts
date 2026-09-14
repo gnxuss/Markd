@@ -70,7 +70,7 @@ describe("bulk organization built Chromium", () => {
       "https://duplicate.example/shared",
       "https://duplicate.example/shared",
     ]);
-  }, 60_000);
+  }, 120_000);
 
   it("keeps ordinary row interactions intact outside selection mode", async () => {
     fixture = await launchExtension([

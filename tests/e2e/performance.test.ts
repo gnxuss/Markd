@@ -3,12 +3,24 @@ import { afterEach, describe, expect, it } from "vitest";
 import { launchExtension, type ExtensionFixture, type SeedNode } from "./fixtures.js";
 
 const bookmarkCount = 2_000;
-const largeLibrary = Array.from({ length: bookmarkCount }, (_, index) => ({
-  kind: "bookmark",
-  key: `bookmark-${index}`,
-  title: `Performance bookmark ${String(index).padStart(4, "0")}`,
-  url: `https://performance.example/bookmark/${index}`,
-})) satisfies readonly SeedNode[];
+const largeLibrary = [
+  ...Array.from({ length: bookmarkCount - 1 }, (_, index) => ({
+    kind: "bookmark" as const,
+    key: `bookmark-${index}`,
+    title: `Performance bookmark ${String(index).padStart(4, "0")}`,
+    url: `https://performance.example/bookmark/${index}`,
+  })),
+  { kind: "folder", title: "Deep archive", children: [
+    { kind: "folder", title: "Needle shelf", children: [
+      {
+        kind: "bookmark",
+        key: "bookmark-1999",
+        title: "Performance bookmark 1999",
+        url: "https://performance.example/bookmark/1999",
+      },
+    ] },
+  ] },
+] satisfies readonly SeedNode[];
 
 let fixture: ExtensionFixture | undefined;
 
@@ -21,6 +33,11 @@ describe("large-library built Chromium", () => {
   it("keeps the live bookmark DOM bounded while every result remains reachable", async () => {
     // Given: a disposable Chromium profile with 2,000 native bookmarks.
     fixture = await launchExtension(largeLibrary, true);
+    const lastId = fixture.bookmarks["bookmark-1999"]?.id;
+    if (lastId === undefined) throw new TypeError("Off-page performance seed unavailable");
+    await fixture.worker.evaluate(async (id) => chrome.storage.local.set({
+      [`bookmark-note:1:${id}`]: { version: 1, note: "Rare memory phrase" },
+    }), lastId);
 
     // When: Markd reaches ready state and repeats retrieval changes.
     const page = await fixture.openLibrary();
@@ -31,6 +48,23 @@ describe("large-library built Chromium", () => {
       rows: document.querySelectorAll(".bookmark-row").length,
       elements: document.querySelectorAll("*").length,
     }));
+    await page.evaluate(() => {
+      const root = document.documentElement;
+      root.dataset["bookmarkReads"] = "0";
+      root.dataset["storageReads"] = "0";
+      chrome.bookmarks.getTree = new Proxy(chrome.bookmarks.getTree, {
+        apply: (target, thisArgument, argumentsList) => {
+          root.dataset["bookmarkReads"] = String(Number(root.dataset["bookmarkReads"] ?? "0") + 1);
+          return Reflect.apply(target, thisArgument, argumentsList);
+        },
+      });
+      chrome.storage.local.get = new Proxy(chrome.storage.local.get, {
+        apply: (target, thisArgument, argumentsList) => {
+          root.dataset["storageReads"] = String(Number(root.dataset["storageReads"] ?? "0") + 1);
+          return Reflect.apply(target, thisArgument, argumentsList);
+        },
+      });
+    });
     for (let cycle = 0; cycle < 5; cycle += 1) {
       await page.type("#bookmark-search", "missing");
       await page.click("#bookmark-search", { count: 3 });
@@ -43,9 +77,15 @@ describe("large-library built Chromium", () => {
       ".bookmark-row",
       (element) => element.getAttribute("data-bookmark-id"),
     );
-    await page.type("#bookmark-search", "Performance bookmark 1999");
-    const lastId = fixture.bookmarks["bookmark-1999"]?.id;
+    await page.type("#bookmark-search", "rare memory phrase");
     expect(await page.$(`[data-bookmark-id="${lastId}"]`)).not.toBeNull();
+    await page.click("#bookmark-search", { count: 3 });
+    await page.type("#bookmark-search", "needle shelf");
+    expect(await page.$(`[data-bookmark-id="${lastId}"]`)).not.toBeNull();
+    expect(await page.evaluate(() => ({
+      bookmarks: document.documentElement.dataset["bookmarkReads"],
+      storage: document.documentElement.dataset["storageReads"],
+    }))).toEqual({ bookmarks: "0", storage: "0" });
     await page.click("#bookmark-search", { count: 3 });
     await page.keyboard.press("Backspace");
     const firstId = fixture.bookmarks["bookmark-0"]?.id;
@@ -62,6 +102,26 @@ describe("large-library built Chromium", () => {
     expect(await page.$(firstRow)).not.toBeNull();
     await page.click(`${firstRow} [aria-label="Remove Performance"]`);
     await page.waitForFunction(() => document.querySelector('[data-tag-key="performance"]') === null);
+    await page.click(".selection-mode-toggle");
+    await page.click(`${firstRow} .bookmark-selection input`);
+    for (let pageIndex = 1; pageIndex < 20; pageIndex += 1) {
+      await page.click(".pagination-button:last-child");
+    }
+    await page.click(`[data-bookmark-id="${lastId}"] .bookmark-selection input`);
+    expect(await page.$eval(".selection-count", (element) => element.textContent)).toBe("2 selected");
+    const selectionCounts = await page.evaluate(() => ({
+      rows: document.querySelectorAll(".bookmark-row").length,
+      checkboxes: document.querySelectorAll(".bookmark-selection input").length,
+      elements: document.querySelectorAll("*").length,
+    }));
+    await page.type(".bulk-tag-input", "Bulk performance");
+    await page.keyboard.press("Enter");
+    await page.click(".bulk-add");
+    await page.waitForFunction(() => document.querySelector(".bulk-status")?.textContent === "Tags updated.");
+    await page.click(".selection-mode-toggle");
+    for (let pageIndex = 19; pageIndex > 0; pageIndex -= 1) {
+      await page.click(".pagination-button:first-child");
+    }
     await fixture.native.update(firstId, { title: "Performance bookmark renamed" });
     const createdId = await fixture.native.create({
       parentId: "1",
@@ -104,6 +164,7 @@ describe("large-library built Chromium", () => {
         heapBytes: repeatedMetrics.JSHeapUsedSize,
         ...repeatedCounts,
       },
+      selection: selectionCounts,
       pageTargets: fixture.browser.targets().filter((target) => target.type() === "page").length,
     }));
 
@@ -111,6 +172,9 @@ describe("large-library built Chromium", () => {
     expect(initialCounts.rows).toBeLessThanOrEqual(100);
     expect(repeatedCounts.rows).toBeLessThanOrEqual(100);
     expect(repeatedCounts.elements).toBeLessThan(1_000);
+    expect(selectionCounts.rows).toBeLessThanOrEqual(100);
+    expect(selectionCounts.checkboxes).toBeLessThanOrEqual(100);
+    expect(selectionCounts.elements).toBeLessThan(1_200);
     expect(lastPageFirstId).toBe(fixture.bookmarks["bookmark-1900"]?.id);
     const pageTarget = page.target();
     await page.close();
