@@ -1,17 +1,24 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createLibraryController } from "../../src/library/controller.js";
-import { renderLibrary } from "../../src/library/render.js";
+import { createLibraryRenderer, renderLibrary } from "../../src/library/render.js";
 import type { BookmarkRow, LibraryState } from "../../src/types.js";
 
 class FakeElement {
   readonly attributes = new Map<string, string>();
   readonly children: FakeElement[] = [];
+  readonly listeners = new Map<string, (event: Event) => void>();
   className = "";
   hidden = false;
   textContent: string | null = null;
 
-  addEventListener(_type: string, _listener: (event: Event) => void): void {}
+  addEventListener(type: string, listener: (event: Event) => void): void {
+    this.listeners.set(type, listener);
+  }
+
+  click(): void {
+    this.listeners.get("click")?.(new Event("click"));
+  }
 
   append(...nodes: readonly FakeElement[]): void {
     this.children.push(...nodes);
@@ -144,5 +151,41 @@ describe("library state", () => {
       vi.fn(),
     );
     expect(catalog.children[0]?.textContent).toBe("No tags yet");
+  });
+
+  it("pages ready rows, retains a valid page, and clamps after source shrink", () => {
+    // Given: a stateful renderer and 205 ordered native bookmark rows.
+    const bookmarks = new FakeElement();
+    const renderer = createLibraryRenderer(
+      { document: new FakeDocument(), status: new FakeElement(), bookmarks },
+      vi.fn(),
+    );
+    const rows = Array.from({ length: 205 }, (_, index) => ({
+      ...row,
+      id: `native-${index}`,
+      title: `Bookmark ${index}`,
+    }));
+    const state: LibraryState = {
+      kind: "ready",
+      rows,
+      view: "all",
+      query: "",
+      selectedTagKeys: [],
+      catalog: [],
+      rowStates: {},
+      tagStates: {},
+    };
+    renderer.render(state);
+
+    // When: the user advances a page and the same source later shrinks.
+    bookmarks.children[1]?.children[2]?.click();
+    const secondPageFirstId = bookmarks.children[0]?.children[0]?.attributes.get("data-bookmark-id");
+    renderer.render({ ...state, rows: rows.slice(0, 50) });
+
+    // Then: only one bounded page renders and the now-invalid page clamps to the first.
+    expect(secondPageFirstId).toBe("native-100");
+    expect(bookmarks.children[0]?.children).toHaveLength(50);
+    expect(bookmarks.children[0]?.children[0]?.attributes.get("data-bookmark-id")).toBe("native-0");
+    expect(bookmarks.children[1]?.children[1]?.textContent).toBe("Showing 1–50 of 50");
   });
 });

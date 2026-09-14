@@ -1,6 +1,7 @@
 import { displayUrl } from "../bookmarks/display-url.js";
 import type { BookmarkActivation } from "./controller.js";
 import type { BookmarkRow, LibraryState, RowOpenState, RowTagState, TagRecord } from "../types.js";
+import { createPagination, pageBounds } from "./pagination.js";
 import { createTagEditor } from "./tag-editor.js";
 
 export interface RenderElement {
@@ -32,6 +33,16 @@ export type ActivateBookmark = (event: BookmarkActivation, row: BookmarkRow) => 
 export type AddTag = (bookmarkId: string, input: string) => void;
 export type RemoveTag = (bookmarkId: string, tagKey: string) => void;
 export type ToggleTagFilter = (tagKey: string) => void;
+
+export type LibraryRenderer = {
+  readonly render: (state: LibraryState) => void;
+  readonly dispose: () => void;
+};
+
+type PageRender = {
+  readonly index: number;
+  readonly navigate: (index: number) => void;
+};
 
 function activationFromEvent(event: Event): BookmarkActivation | undefined {
   if (!(event instanceof MouseEvent)) return undefined;
@@ -99,13 +110,14 @@ function createBookmarkRow(
   return item;
 }
 
-export function renderLibrary(
+function renderLibraryPage(
   state: LibraryState,
   elements: LibraryElements,
   activate: ActivateBookmark,
   addTag: AddTag = () => undefined,
   removeTag: RemoveTag = () => undefined,
   toggleTagFilter: ToggleTagFilter = () => undefined,
+  page: PageRender = { index: 0, navigate: () => undefined },
 ): void {
   elements.document.replaceChildren(elements.bookmarks, []);
   elements.status.hidden = false;
@@ -160,9 +172,11 @@ export function renderLibrary(
         : emptyUntagged ? "All bookmarks are tagged." : "";
       elements.status.hidden = !noMatches && !emptyUntagged;
       if (noMatches || emptyUntagged) return;
+      const bounds = pageBounds(state.rows.length, page.index);
+      const visibleRows = state.rows.slice(bounds.start, bounds.end);
       const list = elements.document.createElement("ul");
       list.className = "bookmark-list";
-      for (const row of state.rows) {
+      for (const row of visibleRows) {
         const openState = state.rowStates[row.id] ?? { kind: "idle" };
         const tagState = state.tagStates[row.id] ?? { kind: "idle", input: "", focus: false };
         elements.document.append(list, [
@@ -170,6 +184,8 @@ export function renderLibrary(
         ]);
       }
       elements.document.append(elements.bookmarks, [list]);
+      const navigation = createPagination(elements, bounds, state.rows.length, page.navigate);
+      elements.document.append(elements.bookmarks, [navigation]);
       return;
     }
     default: {
@@ -177,4 +193,54 @@ export function renderLibrary(
       return exhaustiveState;
     }
   }
+}
+
+export function renderLibrary(
+  state: LibraryState,
+  elements: LibraryElements,
+  activate: ActivateBookmark,
+  addTag: AddTag = () => undefined,
+  removeTag: RemoveTag = () => undefined,
+  toggleTagFilter: ToggleTagFilter = () => undefined,
+): void {
+  renderLibraryPage(state, elements, activate, addTag, removeTag, toggleTagFilter);
+}
+
+export function createLibraryRenderer(
+  elements: LibraryElements,
+  activate: ActivateBookmark,
+  addTag: AddTag = () => undefined,
+  removeTag: RemoveTag = () => undefined,
+  toggleTagFilter: ToggleTagFilter = () => undefined,
+): LibraryRenderer {
+  let pageIndex = 0;
+  let criteriaSignature = "";
+  let disposed = false;
+
+  const render = (state: LibraryState): void => {
+    if (disposed) return;
+    if (state.kind !== "ready") {
+      pageIndex = 0;
+      criteriaSignature = "";
+      renderLibraryPage(state, elements, activate, addTag, removeTag, toggleTagFilter);
+      return;
+    }
+    const nextSignature = `${state.view}\n${state.query}\n${state.selectedTagKeys.join("\n")}`;
+    if (nextSignature !== criteriaSignature) pageIndex = 0;
+    criteriaSignature = nextSignature;
+    const bounds = pageBounds(state.rows.length, pageIndex);
+    pageIndex = bounds.index;
+    renderLibraryPage(state, elements, activate, addTag, removeTag, toggleTagFilter, {
+      index: pageIndex,
+      navigate: (nextPage) => {
+        pageIndex = pageBounds(state.rows.length, nextPage).index;
+        render(state);
+      },
+    });
+  };
+
+  return {
+    render,
+    dispose: () => { disposed = true; },
+  };
 }

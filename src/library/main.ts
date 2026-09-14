@@ -2,7 +2,7 @@ import { loadBookmarkRows } from "../bookmarks/chrome-bookmarks.js";
 import { loadTagAssignments, writeBookmarkTags } from "../tags/chrome-tag-storage.js";
 import { subscribeBookmarkLifecycle } from "./bookmark-lifecycle.js";
 import { createLibraryController } from "./controller.js";
-import { renderLibrary } from "./render.js";
+import { createLibraryRenderer } from "./render.js";
 import type { RenderElement } from "./render.js";
 
 function requiredElement(id: string): HTMLElement {
@@ -44,19 +44,20 @@ const elements = {
   tagCatalog: requiredElement("tag-catalog"),
   search: requiredElement("bookmark-search"),
 };
+let renderer: ReturnType<typeof createLibraryRenderer>;
 const controller = createLibraryController({
   loadRows: loadBookmarkRows,
   loadTags: loadTagAssignments,
   writeTags: writeBookmarkTags,
-  render: (state) => renderLibrary(
-    state,
-    elements,
-    (event, row) => { void controller.activate(event, row); },
-    (bookmarkId, input) => { void controller.addTag(bookmarkId, input); },
-    (bookmarkId, tagKey) => { void controller.removeTag(bookmarkId, tagKey); },
-    (tagKey) => controller.toggleTagFilter(tagKey),
-  ),
+  render: (state) => renderer.render(state),
 });
+renderer = createLibraryRenderer(
+  elements,
+  (event, row) => { void controller.activate(event, row); },
+  (bookmarkId, input) => { void controller.addTag(bookmarkId, input); },
+  (bookmarkId, tagKey) => { void controller.removeTag(bookmarkId, tagKey); },
+  (tagKey) => controller.toggleTagFilter(tagKey),
+);
 elements.allView.addEventListener("click", () => controller.selectView("all"));
 elements.untaggedView.addEventListener("click", () => controller.selectView("untagged"));
 elements.search.addEventListener("input", (event) => {
@@ -64,3 +65,10 @@ elements.search.addEventListener("input", (event) => {
 });
 const lifecycle = subscribeBookmarkLifecycle(chrome.bookmarks, controller.refresh);
 void lifecycle.start();
+let disposed = false;
+window.addEventListener("pagehide", () => {
+  if (disposed) return;
+  disposed = true;
+  lifecycle.dispose();
+  renderer.dispose();
+}, { once: true });
