@@ -12,11 +12,19 @@
       <section id="content" aria-busy="true">
         <p id="page-title">Loading current page…</p>
         <p id="page-url"></p>
+        <p id="bookmark-state" hidden></p>
         <form id="save-form">
           <label for="folder">Folder</label><select id="folder" required></select>
           <label for="tag-input">Tags</label>
           <div id="selected-tags" aria-label="Selected tags"></div>
-          <div class="tag-entry"><input id="tag-input" autocomplete="off" /><button id="add-tag" type="button">Add</button></div>
+          <div class="tag-entry" role="combobox" aria-haspopup="listbox" aria-owns="tag-suggestions">
+            <input id="tag-input" autocomplete="off" aria-autocomplete="list" aria-controls="tag-suggestions" aria-expanded="false" />
+            <button id="add-tag" type="button">Add</button>
+            <div id="tag-suggestions" role="listbox"></div>
+          </div>
+          <div id="recent-tags" aria-label="Recently used tags"></div>
+          <label for="note">Note <span>optional · 280 characters</span></label>
+          <textarea id="note" maxlength="280" rows="3"></textarea>
           <button id="save" type="submit">Save</button>
         </form>
       </section>

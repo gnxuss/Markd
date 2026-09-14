@@ -15,6 +15,7 @@ export type QuickSaveContext = {
   readonly page: ActivePage;
   readonly folders: readonly FolderChoice[];
   readonly matches: readonly BookmarkMatch[];
+  readonly bookmarkIds: readonly string[];
 };
 export type ActivePageResult =
   | { readonly kind: "ready"; readonly page: ActivePage }
@@ -44,6 +45,7 @@ export function deriveQuickSaveContext(
 ): QuickSaveContext {
   const folders: FolderChoice[] = [];
   const matches: BookmarkMatch[] = [];
+  const bookmarkIds: string[] = [];
   const visit = (node: chrome.bookmarks.BookmarkTreeNode, ancestors: readonly string[], synthetic: boolean): void => {
     const isFolder = node.url === undefined;
     const path = synthetic || !isFolder ? ancestors : [...ancestors, node.title];
@@ -56,8 +58,9 @@ export function deriveQuickSaveContext(
         folderLabel: ancestors.join(" / "),
       });
     }
+    if (node.url !== undefined) bookmarkIds.push(node.id);
     for (const child of node.children ?? []) visit(child, path, false);
   };
   for (const root of tree) visit(root, [], true);
-  return { page, folders, matches };
+  return { page, folders, matches, bookmarkIds };
 }
