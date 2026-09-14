@@ -4,6 +4,7 @@ main { padding: 1rem; }
 header { display: flex; align-items: baseline; gap: 0.6rem; border-bottom: 1px solid #deded8; }
 header span { color: #315efb; font-size: 0.68rem; font-weight: 750; letter-spacing: 0.14em; }
 h1 { margin: 0 0 0.75rem; font-family: Georgia, serif; font-size: 1.35rem; letter-spacing: -0.035em; }
+#open-library { margin-left: auto; padding: 0.28rem 0.45rem; border: 1px solid #c9c9c1; background: transparent; color: #515149; font-size: 0.72rem; }
 #page-title { margin: 0.9rem 0 0.2rem; overflow: hidden; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 #page-url { margin: 0 0 0.9rem; overflow: hidden; color: #66665f; font-size: 0.78rem; text-overflow: ellipsis; white-space: nowrap; }
 form { display: grid; gap: 0.45rem; }

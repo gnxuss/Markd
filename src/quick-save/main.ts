@@ -23,6 +23,7 @@ const suggestionList = requiredElement("tag-suggestions", HTMLElement);
 const recentList = requiredElement("recent-tags", HTMLElement);
 const note = requiredElement("note", HTMLTextAreaElement);
 const save = requiredElement("save", HTMLButtonElement);
+const openLibrary = requiredElement("open-library", HTMLButtonElement);
 const status = requiredElement("status", HTMLElement);
 
 let controller: ReturnType<typeof createQuickSaveController> | undefined;
@@ -113,6 +114,9 @@ form.addEventListener("submit", (event) => {
   event.preventDefault();
   if (tagInput.value.trim().length > 0) commitTag();
   if (controller !== undefined) void controller.submit(folder.value);
+});
+openLibrary.addEventListener("click", () => {
+  void chrome.tabs.create({ active: true, url: chrome.runtime.getURL("library.html") });
 });
 
 async function bootstrap(): Promise<void> {
