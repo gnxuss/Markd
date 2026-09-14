@@ -7,7 +7,7 @@
     "build": "node esbuild.mjs",
     "check": "tsc --noEmit && node esbuild.mjs --check",
     "test": "vitest run",
-    "test:e2e": "vitest run tests/e2e"
+    "test:e2e": "vitest run tests/e2e --maxWorkers=1"
   },
   "devDependencies": {
     "@types/chrome": "0.2.9",

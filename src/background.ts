@@ -1,4 +1,5 @@
 import {
+  reconcileChangedMetadata,
   reconcileRemovedBookmark,
   reconcileStaleMetadata,
 } from "./bookmarks/metadata-reconciliation.js";
@@ -6,6 +7,8 @@ import { bookmarkIdFromAssignmentKey } from "./tags/chrome-tag-storage.js";
 
 let reconciliationPending = false;
 let activeReconciliation: Promise<void> | undefined;
+const pendingChangedIds = new Set<string>();
+let activeChangedReconciliation: Promise<void> | undefined;
 
 function reportFailure(operation: string, error: unknown): void {
   const kind = error instanceof Error ? error.name : "UnknownError";
@@ -26,6 +29,23 @@ function queueFullReconciliation(): Promise<void> {
     }
   })();
   return activeReconciliation;
+}
+
+function queueChangedReconciliation(bookmarkIds: readonly string[]): Promise<void> {
+  for (const bookmarkId of bookmarkIds) pendingChangedIds.add(bookmarkId);
+  if (activeChangedReconciliation !== undefined) return activeChangedReconciliation;
+  activeChangedReconciliation = (async (): Promise<void> => {
+    try {
+      while (pendingChangedIds.size > 0) {
+        const changedIds = [...pendingChangedIds];
+        pendingChangedIds.clear();
+        await reconcileChangedMetadata(changedIds);
+      }
+    } finally {
+      activeChangedReconciliation = undefined;
+    }
+  })();
+  return activeChangedReconciliation;
 }
 
 chrome.action.onClicked.addListener(() => {
@@ -50,10 +70,13 @@ chrome.runtime.onStartup.addListener(() => {
 });
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== "local") return;
-  const addedAssignment = Object.entries(changes).some(([storageKey, change]) =>
-    bookmarkIdFromAssignmentKey(storageKey) !== undefined && change.newValue !== undefined);
-  if (!addedAssignment) return;
-  void queueFullReconciliation().catch((error: unknown) => {
+  const changedIds = Object.entries(changes).flatMap(([storageKey, change]) => {
+    if (change.newValue === undefined) return [];
+    const bookmarkId = bookmarkIdFromAssignmentKey(storageKey);
+    return bookmarkId === undefined ? [] : [bookmarkId];
+  });
+  if (changedIds.length === 0) return;
+  void queueChangedReconciliation(changedIds).catch((error: unknown) => {
     reportFailure("storage reconciliation", error);
   });
 });

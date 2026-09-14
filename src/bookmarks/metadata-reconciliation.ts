@@ -9,6 +9,11 @@ export type MetadataReconciliationDependencies = {
   readonly removeAssignments: (bookmarkIds: readonly string[]) => Promise<void>;
 };
 
+export type ChangedMetadataDependencies = Pick<
+  MetadataReconciliationDependencies,
+  "loadTree" | "removeAssignments"
+>;
+
 const defaultDependencies: MetadataReconciliationDependencies = {
   loadTree: () => chrome.bookmarks.getTree(),
   listAssignmentIds: listBookmarkTagIds,
@@ -41,4 +46,15 @@ export async function reconcileStaleMetadata(
   ]);
   const liveIds = new Set(tree.flatMap((root) => collectUrlBookmarkIds(root)));
   await dependencies.removeAssignments(assignmentIds.filter((id) => !liveIds.has(id)));
+}
+
+export async function reconcileChangedMetadata(
+  changedIds: readonly string[],
+  dependencies: ChangedMetadataDependencies = defaultDependencies,
+): Promise<void> {
+  if (changedIds.length === 0) return;
+  const tree = await dependencies.loadTree();
+  const liveIds = new Set(tree.flatMap((root) => collectUrlBookmarkIds(root)));
+  const staleIds = [...new Set(changedIds)].filter((id) => !liveIds.has(id));
+  if (staleIds.length > 0) await dependencies.removeAssignments(staleIds);
 }

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   collectUrlBookmarkIds,
+  reconcileChangedMetadata,
   reconcileRemovedBookmark,
   reconcileStaleMetadata,
 } from "../../src/bookmarks/metadata-reconciliation.js";
@@ -45,6 +46,19 @@ describe("bookmark metadata reconciliation", () => {
     const removeAssignments = vi.fn(async (_ids: readonly string[]) => undefined);
 
     await reconcileStaleMetadata({ loadTree, listAssignmentIds, removeAssignments });
+
+    expect(loadTree).toHaveBeenCalledTimes(1);
+    expect(removeAssignments).toHaveBeenCalledWith(["stale"]);
+  });
+
+  it("checks only changed assignment IDs against one native snapshot", async () => {
+    const loadTree = vi.fn(async () => tree);
+    const removeAssignments = vi.fn(async (_ids: readonly string[]) => undefined);
+
+    await reconcileChangedMetadata(["live-one", "stale", "live-two"], {
+      loadTree,
+      removeAssignments,
+    });
 
     expect(loadTree).toHaveBeenCalledTimes(1);
     expect(removeAssignments).toHaveBeenCalledWith(["stale"]);
