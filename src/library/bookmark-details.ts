@@ -24,20 +24,22 @@ export type BookmarkDetailsState =
     };
 
 export type BookmarkDetails = {
-  readonly state: () => BookmarkDetailsState;
-  readonly open: (bookmarkId: string) => Promise<void>;
+  readonly state: (bookmarkId: string) => BookmarkDetailsState;
+  readonly areAllOpen: (bookmarkIds: readonly string[]) => boolean;
   readonly toggle: (bookmarkId: string) => Promise<void>;
-  readonly close: () => void;
-  readonly setDraft: (draft: string) => void;
-  readonly save: () => Promise<void>;
-  readonly retry: () => Promise<void>;
+  readonly openAll: (bookmarkIds: readonly string[]) => Promise<void>;
+  readonly closeAll: (bookmarkIds: readonly string[]) => void;
+  readonly retain: (bookmarkIds: readonly string[]) => void;
+  readonly setDraft: (bookmarkId: string, draft: string) => void;
+  readonly save: (bookmarkId: string) => Promise<void>;
+  readonly retry: (bookmarkId: string) => Promise<void>;
   readonly dispose: () => void;
 };
 
 type BookmarkDetailsDependencies = {
   readonly load: (bookmarkId: string) => Promise<string>;
   readonly write: (bookmarkId: string, note: string) => Promise<void>;
-  readonly onState: (state: BookmarkDetailsState) => void;
+  readonly onState: () => void;
 };
 
 function errorMessage(error: unknown, action: "load" | "save"): string {
@@ -50,25 +52,31 @@ function errorMessage(error: unknown, action: "load" | "save"): string {
 export function createBookmarkDetails(
   dependencies: BookmarkDetailsDependencies,
 ): BookmarkDetails {
-  let current: BookmarkDetailsState = { kind: "closed" };
-  let generation = 0;
+  const states = new Map<string, BookmarkDetailsState>();
+  const generations = new Map<string, number>();
   let disposed = false;
 
-  const publish = (state: BookmarkDetailsState): void => {
-    current = state;
-    if (!disposed) dependencies.onState(state);
+  const publish = (): void => {
+    if (!disposed) dependencies.onState();
   };
-
-  const open = async (bookmarkId: string): Promise<void> => {
-    const request = ++generation;
-    publish({ kind: "loading", bookmarkId });
+  const nextGeneration = (bookmarkId: string): number => {
+    const next = (generations.get(bookmarkId) ?? 0) + 1;
+    generations.set(bookmarkId, next);
+    return next;
+  };
+  const isCurrent = (bookmarkId: string, generation: number): boolean =>
+    !disposed && generations.get(bookmarkId) === generation;
+  const load = async (bookmarkId: string, notify: boolean): Promise<void> => {
+    const generation = nextGeneration(bookmarkId);
+    states.set(bookmarkId, { kind: "loading", bookmarkId });
+    if (notify) publish();
     try {
       const note = await dependencies.load(bookmarkId);
-      if (disposed || request !== generation) return;
-      publish({ kind: "ready", bookmarkId, note, draft: note, message: "" });
+      if (!isCurrent(bookmarkId, generation)) return;
+      states.set(bookmarkId, { kind: "ready", bookmarkId, note, draft: note, message: "" });
     } catch (error: unknown) {
-      if (disposed || request !== generation) return;
-      publish({
+      if (!isCurrent(bookmarkId, generation)) return;
+      states.set(bookmarkId, {
         kind: "error",
         bookmarkId,
         note: "",
@@ -77,25 +85,26 @@ export function createBookmarkDetails(
         message: errorMessage(error, "load"),
       });
     }
+    if (notify) publish();
   };
-
-  const close = (): void => {
-    generation += 1;
-    publish({ kind: "closed" });
+  const close = (bookmarkId: string): void => {
+    nextGeneration(bookmarkId);
+    states.delete(bookmarkId);
   };
-
-  const save = async (): Promise<void> => {
-    if (current.kind !== "ready" && !(current.kind === "error" && current.operation === "save")) return;
-    const { bookmarkId, note, draft } = current;
-    const request = generation;
-    publish({ kind: "saving", bookmarkId, note, draft });
+  const save = async (bookmarkId: string): Promise<void> => {
+    const current = states.get(bookmarkId);
+    if (current?.kind !== "ready" && !(current?.kind === "error" && current.operation === "save")) return;
+    const { note, draft } = current;
+    const generation = generations.get(bookmarkId) ?? 0;
+    states.set(bookmarkId, { kind: "saving", bookmarkId, note, draft });
+    publish();
     try {
       await dependencies.write(bookmarkId, draft);
-      if (disposed || request !== generation) return;
-      publish({ kind: "ready", bookmarkId, note: draft, draft, message: "Note saved." });
+      if (!isCurrent(bookmarkId, generation)) return;
+      states.set(bookmarkId, { kind: "ready", bookmarkId, note: draft, draft, message: "Note saved." });
     } catch (error: unknown) {
-      if (disposed || request !== generation) return;
-      publish({
+      if (!isCurrent(bookmarkId, generation)) return;
+      states.set(bookmarkId, {
         kind: "error",
         bookmarkId,
         note,
@@ -104,31 +113,56 @@ export function createBookmarkDetails(
         message: errorMessage(error, "save"),
       });
     }
+    publish();
   };
 
   return {
-    state: () => current,
-    open,
+    state: (bookmarkId) => states.get(bookmarkId) ?? { kind: "closed" },
+    areAllOpen: (bookmarkIds) => bookmarkIds.length > 0
+      && bookmarkIds.every((bookmarkId) => states.has(bookmarkId)),
     toggle: async (bookmarkId) => {
-      if (current.kind !== "closed" && current.bookmarkId === bookmarkId) close();
-      else await open(bookmarkId);
+      if (states.has(bookmarkId)) {
+        close(bookmarkId);
+        publish();
+      } else {
+        await load(bookmarkId, true);
+      }
     },
-    close,
-    setDraft: (draft) => {
-      if (current.kind === "ready" || current.kind === "saving" || current.kind === "error") {
-        current = { ...current, draft };
+    openAll: async (bookmarkIds) => {
+      const closedIds = bookmarkIds.filter((bookmarkId) => !states.has(bookmarkId));
+      if (closedIds.length === 0) return;
+      const pending = closedIds.map((bookmarkId) => load(bookmarkId, false));
+      publish();
+      await Promise.all(pending);
+      publish();
+    },
+    closeAll: (bookmarkIds) => {
+      for (const bookmarkId of bookmarkIds) close(bookmarkId);
+      publish();
+    },
+    retain: (bookmarkIds) => {
+      const retained = new Set(bookmarkIds);
+      for (const bookmarkId of states.keys()) {
+        if (!retained.has(bookmarkId)) close(bookmarkId);
+      }
+    },
+    setDraft: (bookmarkId, draft) => {
+      const current = states.get(bookmarkId);
+      if (current?.kind === "ready" || current?.kind === "saving" || current?.kind === "error") {
+        states.set(bookmarkId, { ...current, draft });
       }
     },
     save,
-    retry: async () => {
-      if (current.kind !== "error") return;
-      if (current.operation === "load") await open(current.bookmarkId);
-      else await save();
+    retry: async (bookmarkId) => {
+      const current = states.get(bookmarkId);
+      if (current?.kind !== "error") return;
+      if (current.operation === "load") await load(bookmarkId, true);
+      else await save(bookmarkId);
     },
     dispose: () => {
       disposed = true;
-      generation += 1;
-      current = { kind: "closed" };
+      for (const bookmarkId of states.keys()) nextGeneration(bookmarkId);
+      states.clear();
     },
   };
 }

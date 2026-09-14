@@ -25,6 +25,11 @@ function activationFromEvent(event: Event): BookmarkActivation | undefined {
   };
 }
 
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  return target instanceof Element
+    && target.closest("a,button,input,select,textarea,label,[role=button],.bookmark-details") !== null;
+}
+
 function appendNoteEditor(
   item: RenderElement,
   row: BookmarkRow,
@@ -57,7 +62,7 @@ function appendNoteEditor(
     elements.document.addEventListener(retry, "click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      void details.retry();
+      void details.retry(row.id);
     });
     elements.document.append(panel, [status, retry]);
     elements.document.append(item, [panel]);
@@ -73,7 +78,7 @@ function appendNoteEditor(
   elements.document.setAttribute(textarea, "rows", "3");
   elements.document.setValue?.(textarea, state.draft);
   elements.document.addEventListener(textarea, "input", () => {
-    details.setDraft(elements.document.value?.(textarea) ?? "");
+    details.setDraft(row.id, elements.document.value?.(textarea) ?? "");
   });
   const save = elements.document.createElement("button");
   save.className = "note-save";
@@ -84,7 +89,7 @@ function appendNoteEditor(
   elements.document.addEventListener(save, "click", (event) => {
     event.preventDefault();
     event.stopPropagation();
-    void details.save();
+    void details.save(row.id);
   });
   elements.document.append(panel, [status, label, textarea, save]);
   elements.document.append(item, [panel]);
@@ -103,30 +108,34 @@ export function createBookmarkRow(
   item.className = "bookmark-row";
   elements.document.setAttribute(item, "data-bookmark-id", row.id);
   elements.document.setAttribute(item, "aria-busy", String(openState.kind === "opening"));
-  const link = elements.document.createElement("a");
-  link.className = "bookmark-link";
-  elements.document.setAttribute(link, "href", row.url);
   const handleActivation = (event: Event): void => {
     const activation = activationFromEvent(event);
     if (activation !== undefined) actions.activate(activation, row);
   };
-  elements.document.addEventListener(link, "click", handleActivation);
-  elements.document.addEventListener(link, "auxclick", handleActivation);
-  const title = elements.document.createElement("span");
-  title.className = "bookmark-title";
+  const title = elements.document.createElement("a");
+  title.className = "bookmark-link bookmark-title";
   title.textContent = row.title.length > 0 ? row.title : "Untitled bookmark";
-  const url = elements.document.createElement("span");
-  url.className = "bookmark-url";
+  const url = elements.document.createElement("a");
+  url.className = "bookmark-link bookmark-url";
   url.textContent = displayUrl(row.url);
+  for (const link of [title, url]) {
+    elements.document.setAttribute(link, "href", row.url);
+    elements.document.addEventListener(link, "click", handleActivation);
+    elements.document.addEventListener(link, "auxclick", handleActivation);
+  }
   const editor = createTagEditor(row, tagState, catalog, elements, {
     add: actions.addTag,
     remove: actions.removeTag,
   });
-  elements.document.append(link, [title]);
-  elements.document.append(item, [link, url, editor.tags, editor.form]);
+  elements.document.append(item, [title, url, editor.tags, editor.form]);
   if (details !== undefined) {
-    const detailState = details.state();
-    const expanded = detailState.kind !== "closed" && detailState.bookmarkId === row.id;
+    const detailState = details.state(row.id);
+    const expanded = detailState.kind !== "closed";
+    elements.document.addEventListener(item, "click", (event) => {
+      if (event instanceof MouseEvent && event.button === 0 && !isInteractiveTarget(event.target)) {
+        void details.toggle(row.id);
+      }
+    });
     const button = elements.document.createElement("button");
     button.className = "details-toggle";
     button.textContent = expanded ? "Hide details" : "Details";
@@ -139,7 +148,7 @@ export function createBookmarkRow(
       void details.toggle(row.id);
     });
     elements.document.append(item, [button]);
-    if (detailState.kind !== "closed" && detailState.bookmarkId === row.id) {
+    if (detailState.kind !== "closed") {
       appendNoteEditor(item, row, detailState, elements, details);
     }
   }

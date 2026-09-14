@@ -60,7 +60,7 @@ describe("duplicate-urls built Chromium", () => {
     fixture = await launchExtension(libraryNodes);
     const page = await fixture.openLibrary();
     await page.waitForSelector(".bookmark-row");
-    const duplicateRows = await page.$$eval(`a[href="${duplicateUrl}"]`, (links) =>
+    const duplicateRows = await page.$$eval(`a.bookmark-title[href="${duplicateUrl}"]`, (links) =>
       links.map((link) => link.closest(".bookmark-row")?.getAttribute("data-bookmark-id")),
     );
     expect(duplicateRows).toEqual([

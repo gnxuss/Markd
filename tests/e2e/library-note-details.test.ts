@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { launchExtension, type ExtensionFixture } from "./fixtures.js";
+import { launchExtension, type ExtensionFixture, type SeedNode } from "./fixtures.js";
 import type { Page } from "puppeteer";
 
 let fixture: ExtensionFixture | undefined;
@@ -23,6 +23,57 @@ async function openQuickSave(activePage: Page): Promise<Page> {
 }
 
 describe("Library note details built Chromium", () => {
+  it("opens bookmarks only from title or URL and toggles details from row space", async () => {
+    fixture = await launchExtension([
+      { kind: "bookmark", key: "target", title: "Interaction target", url: "https://interaction.example/item" },
+    ]);
+    const bookmarkId = fixture.bookmarks["target"]?.id;
+    if (bookmarkId === undefined) throw new TypeError("Seeded bookmark unavailable");
+    const library = await fixture.openLibrary();
+    const row = `[data-bookmark-id="${bookmarkId}"]`;
+
+    await library.$eval(row, (element) => {
+      element.dispatchEvent(new MouseEvent("click", { bubbles: true, button: 0 }));
+    });
+    await library.waitForSelector(`${row} .bookmark-note`);
+    expect(fixture.browser.targets().some((target) => target.url() === "https://interaction.example/item")).toBe(false);
+    await library.click(`${row} .tag-input`);
+    expect(await library.$(`${row} .bookmark-note`)).not.toBeNull();
+    await library.click(`${row} .details-toggle`);
+    expect(await library.$(`${row} .bookmark-note`)).toBeNull();
+
+    for (const selector of [".bookmark-title", ".bookmark-url"] as const) {
+      const openedTarget = fixture.browser.waitForTarget((target) => target.url() === "https://interaction.example/item");
+      await library.click(`${row} ${selector}`, { button: "middle" });
+      const openedPage = await (await openedTarget).asPage();
+      await openedPage?.close();
+    }
+  }, 30_000);
+
+  it("shows and hides details for only the current bounded page", async () => {
+    const nodes = Array.from({ length: 102 }, (_, index) => ({
+      kind: "bookmark",
+      key: `bookmark-${index}`,
+      title: `Bookmark ${index}`,
+      url: `https://details.example/${index}`,
+    })) satisfies readonly SeedNode[];
+    fixture = await launchExtension(nodes);
+    const library = await fixture.openLibrary();
+
+    await library.click(".all-details-toggle");
+    await library.waitForFunction(() => document.querySelectorAll(".bookmark-note").length === 100);
+    expect(await library.$eval(".all-details-toggle", (element) => element.textContent)).toBe("Hide all details");
+    expect(await library.$$(".bookmark-row")).toHaveLength(100);
+    await library.click(".all-details-toggle");
+    expect(await library.$$(".bookmark-note")).toHaveLength(0);
+
+    await library.click(".pagination-button:last-child");
+    expect(await library.$$(".bookmark-row")).toHaveLength(2);
+    await library.click(".all-details-toggle");
+    await library.waitForFunction(() => document.querySelectorAll(".bookmark-note").length === 2);
+    expect(await library.$$(".bookmark-row")).toHaveLength(2);
+  }, 30_000);
+
   it("synchronizes an exact-ID note from Quick Save through Library and back", async () => {
     // Given: Quick Save creates a native bookmark with a note.
     fixture = await launchExtension([]);

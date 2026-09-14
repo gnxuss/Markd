@@ -111,6 +111,21 @@ function renderLibraryPage(
       if (noMatches || emptyUntagged) return;
       const bounds = pageBounds(state.rows.length, page.index);
       const visibleRows = state.rows.slice(bounds.start, bounds.end);
+      const visibleIds = visibleRows.map((row) => row.id);
+      details?.retain(visibleIds);
+      if (details !== undefined) {
+        const allOpen = details.areAllOpen(visibleIds);
+        const toggleAll = elements.document.createElement("button");
+        toggleAll.className = "all-details-toggle";
+        toggleAll.textContent = allOpen ? "Hide all details" : "Show all details";
+        elements.document.setAttribute(toggleAll, "type", "button");
+        elements.document.setAttribute(toggleAll, "aria-expanded", String(allOpen));
+        elements.document.addEventListener(toggleAll, "click", () => {
+          if (allOpen) details.closeAll(visibleIds);
+          else void details.openAll(visibleIds);
+        });
+        elements.document.append(elements.bookmarks, [toggleAll]);
+      }
       const list = elements.document.createElement("ul");
       list.className = "bookmark-list";
       for (const row of visibleRows) {

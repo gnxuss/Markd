@@ -111,7 +111,7 @@ describe("library state", () => {
     );
     const link = bookmarks.children[0]?.children[0]?.children[0];
     expect(link?.attributes.get("href")).toBe(row.url);
-    expect(link?.children[0]?.textContent).toBe(row.title);
+    expect(link?.textContent).toBe(row.title);
     expect(bookmarks.children[0]?.children[0]?.children[1]?.textContent).toBe(
       "example.com/reference",
     );
@@ -126,7 +126,7 @@ describe("library state", () => {
       { document: documentPort, status: new FakeElement(), bookmarks },
       vi.fn(),
     );
-    expect(bookmarks.children[0]?.children[0]?.children[0]?.children[0]?.textContent).toBe(
+    expect(bookmarks.children[0]?.children[0]?.children[0]?.textContent).toBe(
       "Untitled bookmark",
     );
   });
