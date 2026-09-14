@@ -1,6 +1,8 @@
 import type { BookmarkActivation } from "./controller.js";
 import type { BookmarkRow, LibraryState } from "../types.js";
 import type { BookmarkDetails } from "./bookmark-details.js";
+import type { BulkOrganization } from "./bulk-organization.js";
+import { createBulkControls } from "./bulk-controls.js";
 import { createBookmarkRow } from "./bookmark-row.js";
 import { createPagination, pageBounds } from "./pagination.js";
 
@@ -55,6 +57,7 @@ function renderLibraryPage(
   toggleTagFilter: ToggleTagFilter = () => undefined,
   page: PageRender = { index: 0, navigate: () => undefined },
   details?: BookmarkDetails,
+  bulk?: BulkOrganization,
 ): void {
   elements.document.replaceChildren(elements.bookmarks, []);
   elements.status.hidden = false;
@@ -108,6 +111,9 @@ function renderLibraryPage(
         ? "No bookmarks match your search and filters."
         : emptyUntagged ? "All bookmarks are tagged." : "";
       elements.status.hidden = !noMatches && !emptyUntagged;
+      if (bulk !== undefined) {
+        elements.document.append(elements.bookmarks, [createBulkControls(bulk, state.catalog, elements)]);
+      }
       if (noMatches || emptyUntagged) return;
       const bounds = pageBounds(state.rows.length, page.index);
       const visibleRows = state.rows.slice(bounds.start, bounds.end);
@@ -136,7 +142,10 @@ function renderLibraryPage(
             activate,
             addTag,
             removeTag,
-          }, details),
+          }, details, bulk?.state().mode === true ? {
+            selected: bulk.state().selectedIds.includes(row.id),
+            toggle: bulk.toggle,
+          } : undefined),
         ]);
       }
       elements.document.append(elements.bookmarks, [list]);
@@ -169,6 +178,7 @@ export function createLibraryRenderer(
   removeTag: RemoveTag = () => undefined,
   toggleTagFilter: ToggleTagFilter = () => undefined,
   details?: BookmarkDetails,
+  bulk?: BulkOrganization,
 ): LibraryRenderer {
   let pageIndex = 0;
   let criteriaSignature = "";
@@ -179,7 +189,7 @@ export function createLibraryRenderer(
     if (state.kind !== "ready") {
       pageIndex = 0;
       criteriaSignature = "";
-      renderLibraryPage(state, elements, activate, addTag, removeTag, toggleTagFilter, undefined, details);
+      renderLibraryPage(state, elements, activate, addTag, removeTag, toggleTagFilter, undefined, details, bulk);
       return;
     }
     const nextSignature = `${state.view}\n${state.query}\n${state.selectedTagKeys.join("\n")}`;
@@ -193,7 +203,7 @@ export function createLibraryRenderer(
         pageIndex = pageBounds(state.rows.length, nextPage).index;
         render(state);
       },
-    }, details);
+    }, details, bulk);
   };
 
   return {

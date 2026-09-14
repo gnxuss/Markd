@@ -5,6 +5,7 @@ import { subscribeBookmarkLifecycle } from "./bookmark-lifecycle.js";
 import { createBookmarkDetails } from "./bookmark-details.js";
 import { createLibraryController } from "./controller.js";
 import { createLibraryRenderer } from "./render.js";
+import { createBulkOrganization } from "./bulk-organization.js";
 import type { RenderElement } from "./render.js";
 import type { LibraryState } from "../types.js";
 
@@ -62,6 +63,7 @@ const controller = createLibraryController({
   writeTags: writeBookmarkTags,
   render: (state) => {
     latestState = state;
+    if (state.kind === "ready") bulk.retain(controller.getRows().map((row) => row.id));
     renderer.render(state);
   },
 });
@@ -71,6 +73,12 @@ const details = createBookmarkDetails({
   onState: () => renderer.render(latestState),
   onSaved: controller.updateNote,
 });
+const bulk = createBulkOrganization({
+  rows: controller.getRows,
+  write: writeBookmarkTags,
+  commit: controller.commitTags,
+  onState: () => renderer.render(latestState),
+});
 renderer = createLibraryRenderer(
   elements,
   (event, row) => { void controller.activate(event, row); },
@@ -78,6 +86,7 @@ renderer = createLibraryRenderer(
   (bookmarkId, tagKey) => { void controller.removeTag(bookmarkId, tagKey); },
   (tagKey) => controller.toggleTagFilter(tagKey),
   details,
+  bulk,
 );
 elements.allView.addEventListener("click", () => controller.selectView("all"));
 elements.untaggedView.addEventListener("click", () => controller.selectView("untagged"));
@@ -95,5 +104,6 @@ window.addEventListener("pagehide", () => {
   disposed = true;
   lifecycle.dispose();
   details.dispose();
+  bulk.dispose();
   renderer.dispose();
 }, { once: true });

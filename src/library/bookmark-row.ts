@@ -11,6 +11,11 @@ export type BookmarkRowActions = {
   readonly removeTag: (bookmarkId: string, tagKey: string) => void;
 };
 
+export type BookmarkSelection = {
+  readonly selected: boolean;
+  readonly toggle: (bookmarkId: string) => void;
+};
+
 function activationFromEvent(event: Event): BookmarkActivation | undefined {
   if (!(event instanceof MouseEvent)) return undefined;
   const target = event.target;
@@ -103,11 +108,25 @@ export function createBookmarkRow(
   elements: LibraryElements,
   actions: BookmarkRowActions,
   details?: BookmarkDetails,
+  selection?: BookmarkSelection,
 ): RenderElement {
   const item = elements.document.createElement("li");
   item.className = "bookmark-row";
   elements.document.setAttribute(item, "data-bookmark-id", row.id);
   elements.document.setAttribute(item, "aria-busy", String(openState.kind === "opening"));
+  if (selection !== undefined) {
+    const label = elements.document.createElement("label");
+    label.className = "bookmark-selection";
+    const checkbox = elements.document.createElement("input");
+    elements.document.setAttribute(checkbox, "type", "checkbox");
+    elements.document.setAttribute(checkbox, "aria-label", `Select ${row.title || "Untitled bookmark"}`);
+    if (selection.selected) elements.document.setAttribute(checkbox, "checked", "");
+    elements.document.addEventListener(checkbox, "change", () => selection.toggle(row.id));
+    const text = elements.document.createElement("span");
+    text.textContent = "Select";
+    elements.document.append(label, [checkbox, text]);
+    elements.document.append(item, [label]);
+  }
   const handleActivation = (event: Event): void => {
     const activation = activationFromEvent(event);
     if (activation !== undefined) actions.activate(activation, row);

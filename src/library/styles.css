@@ -22,6 +22,17 @@ body { margin: 0; }
 .catalog-tag[aria-pressed="true"] { border-color: #aeb7f0; background: #e7e9ff; color: #253682; }
 .tag-catalog-empty { margin: 0; color: #818179; font-size: 0.82rem; }
 .library-panel { min-width: 0; }
+.bulk-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; margin-bottom: 0.55rem; }
+.selection-mode-toggle, .bulk-stage, .bulk-add, .bulk-remove, .bulk-clear, .bulk-tag-chip { padding: 0.32rem 0.55rem; border: 1px solid #c9c9c1; border-radius: 0.4rem; background: #fff; color: #515149; font: inherit; font-size: 0.76rem; cursor: pointer; }
+.selection-mode-toggle:hover, .bulk-stage:hover, .bulk-add:hover, .bulk-remove:hover, .bulk-clear:hover { border-color: #aeb7f0; color: #253682; }
+.selection-count { color: #515149; font-size: 0.78rem; font-weight: 650; }
+.bulk-tag-form { display: flex; gap: 0.35rem; }
+.bulk-tag-input { width: 11rem; min-width: 0; padding: 0.32rem 0.45rem; border: 1px solid #c9c9c1; border-radius: 0.38rem; font: inherit; font-size: 0.78rem; }
+.bulk-staged-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.bulk-tag-chip { border-color: #aeb7f0; background: #e7e9ff; color: #253682; }
+.bulk-status { min-height: 1rem; color: #55715c; font-size: 0.76rem; }
+.bulk-status.error { color: #a62525; }
+.bookmark-selection { position: absolute; top: 0.62rem; right: 5.8rem; z-index: 2; display: inline-flex; align-items: center; gap: 0.25rem; color: #515149; font-size: 0.72rem; cursor: pointer; }
 .search-control { display: grid; gap: 0.35rem; margin-bottom: 0.8rem; }
 .search-control label { color: #515149; font-size: 0.78rem; font-weight: 650; }
 #bookmark-search { width: 100%; padding: 0.58rem 0.68rem; border: 1px solid #c9c9c1; border-radius: 0.5rem; background: #fff; color: #20201e; font: inherit; }
@@ -60,7 +71,7 @@ body { margin: 0; }
 .bookmark-note { grid-column: 1 / -1; min-width: 0; padding: 0.48rem 0.55rem; border: 1px solid #c9c9c1; border-radius: 0.42rem; background: #fff; color: inherit; font: inherit; resize: vertical; }
 .note-save, .note-retry { justify-self: start; padding: 0.35rem 0.62rem; border: 0; border-radius: 0.38rem; background: #315efb; color: #fff; font: inherit; font-size: 0.78rem; cursor: pointer; }
 .note-save:disabled { cursor: default; opacity: 0.62; }
-.catalog-tag:focus-visible, #bookmark-search:focus-visible, .bookmark-link:focus-visible, .tag-input:focus-visible, .tag-submit:focus-visible, .tag-remove:focus-visible, .tag-suggestion:focus-visible, .pagination-button:focus-visible, .details-toggle:focus-visible, .all-details-toggle:focus-visible, .bookmark-note:focus-visible, .note-save:focus-visible, .note-retry:focus-visible { outline: 3px solid #315efb; outline-offset: 2px; }
+.catalog-tag:focus-visible, #bookmark-search:focus-visible, .bookmark-link:focus-visible, .tag-input:focus-visible, .tag-submit:focus-visible, .tag-remove:focus-visible, .tag-suggestion:focus-visible, .pagination-button:focus-visible, .details-toggle:focus-visible, .all-details-toggle:focus-visible, .bookmark-note:focus-visible, .note-save:focus-visible, .note-retry:focus-visible, .selection-mode-toggle:focus-visible, .bulk-tag-input:focus-visible, .bulk-stage:focus-visible, .bulk-add:focus-visible, .bulk-remove:focus-visible, .bulk-clear:focus-visible, .bulk-tag-chip:focus-visible, .bookmark-selection input:focus-visible { outline: 3px solid #315efb; outline-offset: 2px; }
 [aria-busy="true"] { opacity: 0.65; }
 .bookmark-error, .tag-error { color: #a62525; font-size: 0.78rem; }
 @media (max-width: 42rem) {

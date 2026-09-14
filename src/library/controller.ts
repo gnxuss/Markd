@@ -42,6 +42,8 @@ export type LibraryController = {
   readonly setSearch: (query: string) => void;
   readonly toggleTagFilter: (tagKey: string) => void;
   readonly updateNote: (bookmarkId: string, note: string) => void;
+  readonly getRows: () => readonly BookmarkRow[];
+  readonly commitTags: (updates: Readonly<Record<string, readonly TagRecord[]>>) => void;
 };
 
 export function createLibraryController(
@@ -65,11 +67,7 @@ export function createLibraryController(
       const ids = loadedRows.map((row) => row.id);
       const [assignments, notes] = await Promise.all([loadTags(ids), loadNotes(ids)]);
       const liveIds = new Set(loadedRows.map((row) => row.id));
-      rows = loadedRows.map((row) => enrichBookmarkRow(
-        row,
-        assignments[row.id] ?? [],
-        notes[row.id] ?? "",
-      ));
+      rows = loadedRows.map((row) => enrichBookmarkRow(row, assignments[row.id] ?? [], notes[row.id] ?? ""));
       rowStates = Object.fromEntries(Object.entries(rowStates).filter(([id]) => liveIds.has(id)));
       tagStates = Object.fromEntries(Object.entries(tagStates).filter(([id]) => liveIds.has(id)));
       if (rows.length === 0) dependencies.render({ kind: "empty" });
@@ -100,9 +98,7 @@ export function createLibraryController(
       rowStates,
       tagStates,
     });
-    tagStates = Object.fromEntries(
-      Object.entries(tagStates).map(([id, state]) => [id, { ...state, focus: false }]),
-    );
+    tagStates = Object.fromEntries(Object.entries(tagStates).map(([id, state]) => [id, { ...state, focus: false }]));
   }
 
   async function performAddTag(bookmarkId: string, input: string): Promise<void> {
@@ -218,9 +214,15 @@ export function createLibraryController(
       if (rows.length > 0) renderReady();
     },
     updateNote: (bookmarkId, note): void => {
-      rows = rows.map((row) => row.id === bookmarkId
-        ? enrichBookmarkRow(row, row.tags, note)
-        : row);
+      rows = rows.map((row) => row.id === bookmarkId ? enrichBookmarkRow(row, row.tags, note) : row);
+      if (rows.length > 0) renderReady();
+    },
+    getRows: () => rows,
+    commitTags: (updates): void => {
+      rows = rows.map((row) => {
+        const tags = updates[row.id];
+        return tags === undefined ? row : enrichBookmarkRow(row, tags, row.note ?? "");
+      });
       if (rows.length > 0) renderReady();
     },
     activate: async (event, row): Promise<void> => {
