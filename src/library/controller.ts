@@ -22,7 +22,7 @@ export type BookmarkActivation = {
 
 type LibraryControllerDependencies = {
   readonly loadRows: () => Promise<readonly BookmarkRow[]>;
-  readonly loadTags?: () => Promise<TagAssignments>;
+  readonly loadTags?: (bookmarkIds: readonly string[]) => Promise<TagAssignments>;
   readonly writeTags?: (bookmarkId: string, tags: readonly TagRecord[]) => Promise<void>;
   readonly open?: (url: string, background: boolean) => Promise<void>;
   readonly render: (state: LibraryState) => void;
@@ -56,7 +56,8 @@ export function createLibraryController(
 
   async function refresh(): Promise<void> {
     try {
-      const [loadedRows, assignments] = await Promise.all([dependencies.loadRows(), loadTags()]);
+      const loadedRows = await dependencies.loadRows();
+      const assignments = await loadTags(loadedRows.map((row) => row.id));
       const liveIds = new Set(loadedRows.map((row) => row.id));
       rows = loadedRows.map((row) => ({ ...row, tags: assignments[row.id] ?? [] }));
       rowStates = Object.fromEntries(Object.entries(rowStates).filter(([id]) => liveIds.has(id)));
@@ -73,7 +74,8 @@ export function createLibraryController(
   }
 
   function renderReady(): void {
-    const availableTagKeys = new Set(confirmedTagCatalog(rows).map((tag) => tag.key));
+    const catalog = confirmedTagCatalog(rows);
+    const availableTagKeys = new Set(catalog.map((tag) => tag.key));
     const selectedTagKeys = criteria.selectedTagKeys.filter((key) => availableTagKeys.has(key));
     if (selectedTagKeys.length !== criteria.selectedTagKeys.length) {
       criteria = { ...criteria, selectedTagKeys };
@@ -84,7 +86,7 @@ export function createLibraryController(
       view,
       query: criteria.query,
       selectedTagKeys: criteria.selectedTagKeys,
-      catalog: confirmedTagCatalog(rows),
+      catalog,
       rowStates,
       tagStates,
     });

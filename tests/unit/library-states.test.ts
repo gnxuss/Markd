@@ -87,6 +87,19 @@ describe("library state", () => {
     ]);
   });
 
+  it("loads tag metadata only for native IDs returned by the current refresh", async () => {
+    const loadTags = vi.fn(async (_bookmarkIds: readonly string[]) => ({}));
+    const controller = createLibraryController({
+      loadRows: async () => [row, { ...row, id: "second-native-id" }],
+      loadTags,
+      render: vi.fn(),
+    });
+
+    await controller.refresh();
+
+    expect(loadTags).toHaveBeenCalledWith(["native-id", "second-native-id"]);
+  });
+
   it("renders bookmark-controlled strings as text with native navigation intact", () => {
     const documentPort = new FakeDocument();
     const status = new FakeElement();

@@ -60,9 +60,23 @@ describe("Chrome tag storage", () => {
     }));
     vi.stubGlobal("chrome", { storage: { local: { get } } });
 
-    await expect(loadTagAssignments()).resolves.toEqual({
+    await expect(loadTagAssignments(["native-one", "malformed", "future"])).resolves.toEqual({
       "native-one": [{ key: "design", label: "Design" }],
     });
+    expect(get).toHaveBeenCalledWith([
+      "bookmark-tags:1:native-one",
+      "bookmark-tags:1:malformed",
+      "bookmark-tags:1:future",
+    ]);
+  });
+
+  it("returns without reading storage when no native bookmarks are live", async () => {
+    const get = vi.fn(async () => ({}));
+    vi.stubGlobal("chrome", { storage: { local: { get } } });
+
+    await expect(loadTagAssignments([])).resolves.toEqual({});
+
+    expect(get).not.toHaveBeenCalled();
   });
 
   it("removes the per-bookmark key when the final assignment is removed", async () => {

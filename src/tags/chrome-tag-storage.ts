@@ -55,8 +55,10 @@ export async function removeBookmarkTagAssignments(bookmarkIds: readonly string[
   if (storageKeys.length > 0) await chrome.storage.local.remove(storageKeys);
 }
 
-export async function loadTagAssignments(): Promise<TagAssignments> {
-  const stored: unknown = await chrome.storage.local.get(null);
+export async function loadTagAssignments(bookmarkIds: readonly string[]): Promise<TagAssignments> {
+  if (bookmarkIds.length === 0) return {};
+  const storageKeys = bookmarkIds.map((bookmarkId) => `${STORAGE_PREFIX}${bookmarkId}`);
+  const stored: unknown = await chrome.storage.local.get(storageKeys);
   if (!isRecord(stored)) return {};
   const assignments: Record<string, readonly TagRecord[]> = {};
   for (const [storageKey, value] of Object.entries(stored)) {
