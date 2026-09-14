@@ -1,9 +1,12 @@
 import { loadBookmarkRows } from "../bookmarks/chrome-bookmarks.js";
 import { loadTagAssignments, writeBookmarkTags } from "../tags/chrome-tag-storage.js";
+import { loadBookmarkNote, writeBookmarkNote } from "../quick-save/metadata-storage.js";
 import { subscribeBookmarkLifecycle } from "./bookmark-lifecycle.js";
+import { createBookmarkDetails } from "./bookmark-details.js";
 import { createLibraryController } from "./controller.js";
 import { createLibraryRenderer } from "./render.js";
 import type { RenderElement } from "./render.js";
+import type { LibraryState } from "../types.js";
 
 function requiredElement(id: string): HTMLElement {
   const element = document.getElementById(id);
@@ -32,7 +35,10 @@ const elements = {
     setAttribute: (element: RenderElement, name: string, value: string) => {
       if (element instanceof HTMLElement) element.setAttribute(name, value);
     },
-    value: (element: RenderElement) => element instanceof HTMLInputElement ? element.value : "",
+    value: (element: RenderElement) => element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement ? element.value : "",
+    setValue: (element: RenderElement, value: string) => {
+      if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) element.value = value;
+    },
     focus: (element: RenderElement) => {
       if (element instanceof HTMLElement) queueMicrotask(() => element.focus());
     },
@@ -45,11 +51,20 @@ const elements = {
   search: requiredElement("bookmark-search"),
 };
 let renderer: ReturnType<typeof createLibraryRenderer>;
+let latestState: LibraryState = { kind: "loading" };
+const details = createBookmarkDetails({
+  load: loadBookmarkNote,
+  write: writeBookmarkNote,
+  onState: () => renderer.render(latestState),
+});
 const controller = createLibraryController({
   loadRows: loadBookmarkRows,
   loadTags: loadTagAssignments,
   writeTags: writeBookmarkTags,
-  render: (state) => renderer.render(state),
+  render: (state) => {
+    latestState = state;
+    renderer.render(state);
+  },
 });
 renderer = createLibraryRenderer(
   elements,
@@ -57,6 +72,7 @@ renderer = createLibraryRenderer(
   (bookmarkId, input) => { void controller.addTag(bookmarkId, input); },
   (bookmarkId, tagKey) => { void controller.removeTag(bookmarkId, tagKey); },
   (tagKey) => controller.toggleTagFilter(tagKey),
+  details,
 );
 elements.allView.addEventListener("click", () => controller.selectView("all"));
 elements.untaggedView.addEventListener("click", () => controller.selectView("untagged"));
@@ -73,5 +89,6 @@ window.addEventListener("pagehide", () => {
   if (disposed) return;
   disposed = true;
   lifecycle.dispose();
+  details.dispose();
   renderer.dispose();
 }, { once: true });

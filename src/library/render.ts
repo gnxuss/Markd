@@ -1,8 +1,8 @@
-import { displayUrl } from "../bookmarks/display-url.js";
 import type { BookmarkActivation } from "./controller.js";
-import type { BookmarkRow, LibraryState, RowOpenState, RowTagState, TagRecord } from "../types.js";
+import type { BookmarkRow, LibraryState } from "../types.js";
+import type { BookmarkDetails } from "./bookmark-details.js";
+import { createBookmarkRow } from "./bookmark-row.js";
 import { createPagination, pageBounds } from "./pagination.js";
-import { createTagEditor } from "./tag-editor.js";
 
 export interface RenderElement {
   className: string;
@@ -17,6 +17,7 @@ export interface RenderDocument {
   replaceChildren(element: RenderElement, nodes: readonly RenderElement[]): void;
   setAttribute(element: RenderElement, name: string, value: string): void;
   value?(element: RenderElement): string;
+  setValue?(element: RenderElement, value: string): void;
   focus?(element: RenderElement): void;
 }
 
@@ -44,72 +45,6 @@ type PageRender = {
   readonly navigate: (index: number) => void;
 };
 
-function activationFromEvent(event: Event): BookmarkActivation | undefined {
-  if (!(event instanceof MouseEvent)) return undefined;
-  const target = event.target;
-  const currentTarget = event.currentTarget;
-  const nestedInteractive =
-    target instanceof Element &&
-    target !== currentTarget &&
-    target.closest("button,input,select,textarea,[role=button]") !== null;
-  return {
-    button: event.button,
-    ctrlKey: event.ctrlKey,
-    metaKey: event.metaKey,
-    nestedInteractive,
-    preventDefault: () => event.preventDefault(),
-  };
-}
-
-function createBookmarkRow(
-  row: BookmarkRow,
-  openState: RowOpenState,
-  tagState: RowTagState,
-  elements: LibraryElements,
-  activate: ActivateBookmark,
-  addTag: AddTag,
-  removeTag: RemoveTag,
-  catalog: readonly TagRecord[],
-): RenderElement {
-  const item = elements.document.createElement("li");
-  item.className = "bookmark-row";
-  elements.document.setAttribute(item, "data-bookmark-id", row.id);
-  elements.document.setAttribute(item, "aria-busy", String(openState.kind === "opening"));
-  const link = elements.document.createElement("a");
-  link.className = "bookmark-link";
-  elements.document.setAttribute(link, "href", row.url);
-  const handleActivation = (event: Event): void => {
-    const activation = activationFromEvent(event);
-    if (activation !== undefined) activate(activation, row);
-  };
-  elements.document.addEventListener(link, "click", handleActivation);
-  elements.document.addEventListener(link, "auxclick", handleActivation);
-  const title = elements.document.createElement("span");
-  title.className = "bookmark-title";
-  title.textContent = row.title.length > 0 ? row.title : "Untitled bookmark";
-  const url = elements.document.createElement("span");
-  url.className = "bookmark-url";
-  url.textContent = displayUrl(row.url);
-  const editor = createTagEditor(
-    row,
-    tagState,
-    catalog,
-    elements,
-    { add: addTag, remove: removeTag },
-  );
-  elements.document.append(link, [title]);
-  elements.document.append(item, [link, url, editor.tags, editor.form]);
-  if (openState.kind === "error") {
-    const error = elements.document.createElement("span");
-    error.className = "bookmark-error";
-    error.textContent = openState.message;
-    elements.document.setAttribute(error, "role", "status");
-    elements.document.append(item, [error]);
-  }
-  if (editor.error !== undefined) elements.document.append(item, [editor.error]);
-  return item;
-}
-
 function renderLibraryPage(
   state: LibraryState,
   elements: LibraryElements,
@@ -118,6 +53,7 @@ function renderLibraryPage(
   removeTag: RemoveTag = () => undefined,
   toggleTagFilter: ToggleTagFilter = () => undefined,
   page: PageRender = { index: 0, navigate: () => undefined },
+  details?: BookmarkDetails,
 ): void {
   elements.document.replaceChildren(elements.bookmarks, []);
   elements.status.hidden = false;
@@ -180,7 +116,11 @@ function renderLibraryPage(
         const openState = state.rowStates[row.id] ?? { kind: "idle" };
         const tagState = state.tagStates[row.id] ?? { kind: "idle", input: "", focus: false };
         elements.document.append(list, [
-          createBookmarkRow(row, openState, tagState, elements, activate, addTag, removeTag, state.catalog),
+          createBookmarkRow(row, openState, tagState, state.catalog, elements, {
+            activate,
+            addTag,
+            removeTag,
+          }, details),
         ]);
       }
       elements.document.append(elements.bookmarks, [list]);
@@ -212,6 +152,7 @@ export function createLibraryRenderer(
   addTag: AddTag = () => undefined,
   removeTag: RemoveTag = () => undefined,
   toggleTagFilter: ToggleTagFilter = () => undefined,
+  details?: BookmarkDetails,
 ): LibraryRenderer {
   let pageIndex = 0;
   let criteriaSignature = "";
@@ -222,7 +163,7 @@ export function createLibraryRenderer(
     if (state.kind !== "ready") {
       pageIndex = 0;
       criteriaSignature = "";
-      renderLibraryPage(state, elements, activate, addTag, removeTag, toggleTagFilter);
+      renderLibraryPage(state, elements, activate, addTag, removeTag, toggleTagFilter, undefined, details);
       return;
     }
     const nextSignature = `${state.view}\n${state.query}\n${state.selectedTagKeys.join("\n")}`;
@@ -236,7 +177,7 @@ export function createLibraryRenderer(
         pageIndex = pageBounds(state.rows.length, nextPage).index;
         render(state);
       },
-    });
+    }, details);
   };
 
   return {
