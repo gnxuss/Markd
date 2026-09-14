@@ -24,7 +24,13 @@ export function flattenBookmarks(
       visit(node.children ?? [], title.length === 0 ? ancestors : [...ancestors, title]);
     }
   };
-  for (const root of nodes) visit(root.children ?? [], []);
+  for (const root of nodes) {
+    if (root.url !== undefined) {
+      rows.push({ id: root.id, title: root.title, url: root.url, tags: [], folderPath: "" });
+    } else {
+      visit(root.children ?? [], []);
+    }
+  }
 
   return rows;
 }

@@ -10,6 +10,18 @@ describe("flattenBookmarks", () => {
     expect(projectedRows).toEqual([[], []]);
   });
 
+  it("keeps a URL-bearing node supplied directly at the traversal boundary", () => {
+    const direct = phaseOneBookmarkTree[0]?.children?.find((node) => node.id === "first");
+    if (direct === undefined) throw new TypeError("Direct bookmark fixture unavailable");
+    expect(flattenBookmarks([direct])).toEqual([{
+      id: "first",
+      title: "First",
+      url: "https://www.example.com/first/long/path",
+      tags: [],
+      folderPath: "",
+    }]);
+  });
+
   it("keeps every URL node in depth-first native order across empty folders", () => {
     const projectedRows = flattenBookmarks(phaseOneBookmarkTree);
     expect(projectedRows.map(({ id }) => id)).toEqual([
