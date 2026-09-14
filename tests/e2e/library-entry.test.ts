@@ -14,7 +14,11 @@ describe("Quick Save library entry built Chromium", () => {
     // Given: the installed action is opened on a normal active page.
     fixture = await launchExtension([]);
     const activePage = await fixture.browser.newPage();
-    await activePage.setContent("<title>Library entry article</title>");
+    await activePage.setRequestInterception(true);
+    activePage.on("request", (request) => {
+      void request.respond({ status: 200, contentType: "text/html", body: "<title>Library entry article</title>" });
+    });
+    await activePage.goto("https://library-entry.example/article");
     const extension = [...(await fixture.browser.extensions()).values()]
       .find((candidate) => candidate.name === "Markd");
     if (extension === undefined) throw new TypeError("The built Markd extension was not loaded");
@@ -22,6 +26,8 @@ describe("Quick Save library entry built Chromium", () => {
     await extension.triggerAction(activePage);
     const popup = await (await popupTarget).asPage();
     await popup.waitForSelector("#tag-input");
+    expect(await popup.$eval("#page-title", (element) => element.textContent)).toBe("Library entry article");
+    expect(await popup.$eval("#tag-input", (element) => element === document.activeElement)).toBe(true);
 
     // When: the user activates the popup's compact Library action.
     const libraryTarget = fixture.browser.waitForTarget((target) => target.url() === fixture?.libraryUrl);
