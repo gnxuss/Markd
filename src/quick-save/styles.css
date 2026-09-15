@@ -15,6 +15,19 @@
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+[data-theme="dark"] {
+  color-scheme: dark;
+  background: #11151c;
+  color: #e7ebf1;
+  --accent: #7b9cff;
+  --accent-strong: #a8baff;
+  --accent-soft: #1c294d;
+  --border: #2b3543;
+  --border-strong: #3d4959;
+  --muted: #a8b1bd;
+  --subtle: #7f8a98;
+}
+
 * { box-sizing: border-box; }
 body { width: 360px; margin: 0; }
 main { padding: 1rem 1.05rem 0.85rem; }
@@ -62,6 +75,24 @@ button:hover { border-color: var(--accent-strong); background: var(--accent-stro
 button:disabled { cursor: not-allowed; opacity: 0.52; transform: none; }
 #status { min-height: 1rem; margin: 0.55rem 0 0; color: var(--muted); font-size: 0.74rem; line-height: 1.35; }
 #status.error { color: #b02a37; }
+
+[data-theme="dark"] h1 { color: #f2f5fa; }
+[data-theme="dark"] #open-library { background: #191f29; color: #aeb7c3; }
+[data-theme="dark"] #open-library:hover { border-color: #526cb0; color: #c6d1ff; }
+[data-theme="dark"] #bookmark-state { border-color: #344b80; color: #c2ceff; }
+[data-theme="dark"] label { color: #bdc5cf; }
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea { background: #151b24; color: #e7ebf1; }
+[data-theme="dark"] #add-tag { background: #191f29; color: #bdc5cf; }
+[data-theme="dark"] #add-tag:hover,
+[data-theme="dark"] #recent-tags button:hover { border-color: #526cb0; color: #c6d1ff; }
+[data-theme="dark"] #recent-tags button { color: #aeb7c3; }
+[data-theme="dark"] #tag-suggestions,
+[data-theme="dark"] .tag-suggestion { background: #191f29; color: #e7ebf1; }
+[data-theme="dark"] .tag-chip { border-color: #344b80; color: #c2ceff; }
+[data-theme="dark"] .tag-chip button:hover { background: #304474; }
+[data-theme="dark"] #status.error { color: #ff8c98; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01ms !important; }

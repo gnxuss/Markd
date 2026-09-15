@@ -8,6 +8,7 @@ import { createLibraryRenderer } from "./render.js";
 import { createBulkOrganization } from "./bulk-organization.js";
 import type { RenderElement } from "./render.js";
 import type { LibraryState } from "../types.js";
+import { nextTheme, persistTheme, readTheme, type Theme } from "../theme-preference.js";
 
 function requiredElement(id: string): HTMLElement {
   const element = document.getElementById(id);
@@ -54,6 +55,20 @@ const elements = {
   tagCatalog: requiredElement("tag-catalog"),
   search: requiredElement("bookmark-search"),
 };
+const themeToggle = requiredElement("theme-toggle");
+let theme: Theme = readTheme(localStorage);
+const renderThemeToggle = (): void => {
+  const dark = theme === "dark";
+  themeToggle.textContent = dark ? "Light mode" : "Dark mode";
+  themeToggle.setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
+  themeToggle.setAttribute("aria-pressed", String(dark));
+};
+themeToggle.addEventListener("click", () => {
+  theme = nextTheme(theme);
+  persistTheme(theme);
+  renderThemeToggle();
+});
+renderThemeToggle();
 let renderer: ReturnType<typeof createLibraryRenderer>;
 let latestState: LibraryState = { kind: "loading" };
 const controller = createLibraryController({

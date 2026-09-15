@@ -63,6 +63,14 @@ if (!process.argv.includes("--check")) {
     platform: "browser",
     target: "chrome90",
   });
+  await build({
+    bundle: true,
+    entryPoints: { "theme-loader": "src/theme-loader.ts" },
+    format: "iife",
+    outdir: "dist",
+    platform: "browser",
+    target: "chrome90",
+  });
   await Promise.all([
     cp("manifest.json", "dist/manifest.json"),
     cp("src/library/index.html", "dist/library.html"),

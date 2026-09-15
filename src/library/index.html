@@ -4,12 +4,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Markd</title>
+    <script src="theme-loader.js"></script>
     <link rel="stylesheet" href="library.css" />
   </head>
   <body>
     <main class="app-shell">
       <aside class="sidebar" aria-label="Library navigation">
         <h1>Markd</h1>
+        <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false">Dark mode</button>
         <nav class="view-navigation" aria-label="Bookmark views">
           <button id="all-view" class="view-control active" type="button" aria-current="page">All</button>
           <button id="untagged-view" class="view-control" type="button" aria-current="false">Untagged</button>
