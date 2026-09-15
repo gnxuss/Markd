@@ -201,4 +201,64 @@ describe("library state", () => {
     expect(bookmarks.children[0]?.children[0]?.attributes.get("data-bookmark-id")).toBe("native-0");
     expect(bookmarks.children[1]?.children[1]?.textContent).toBe("Showing 1–50 of 50");
   });
+
+  it("resets pagination only when the selected folder criterion changes", () => {
+    // Given: a renderer positioned on page two of an unchanged ready result.
+    const bookmarks = new FakeElement();
+    const renderer = createLibraryRenderer(
+      { document: new FakeDocument(), status: new FakeElement(), bookmarks },
+      vi.fn(),
+    );
+    const rows = Array.from({ length: 205 }, (_, index) => ({
+      ...row,
+      id: `native-${index}`,
+      title: `Bookmark ${index}`,
+    }));
+    const state: LibraryState = {
+      kind: "ready",
+      rows,
+      view: "all",
+      query: "",
+      selectedTagKeys: [],
+      catalog: [],
+      rowStates: {},
+      tagStates: {},
+    };
+    renderer.render(state);
+    bookmarks.children[1]?.children[2]?.click();
+
+    // When: an unrelated rerender occurs, followed by a folder selection change.
+    renderer.render({ ...state, rowStates: { "native-100": { kind: "opening" } } });
+    const retainedId = bookmarks.children[0]?.children[0]?.attributes.get("data-bookmark-id");
+    renderer.render({ ...state, selectedFolderId: "folder-a" });
+
+    // Then: the unrelated render retains page two and the folder criterion resets page one.
+    expect(retainedId).toBe("native-100");
+    expect(bookmarks.children[0]?.children[0]?.attributes.get("data-bookmark-id")).toBe("native-0");
+  });
+
+  it("treats an empty selected folder as an active no-match filter", () => {
+    // Given: a selected native folder whose subtree has no matching rows.
+    const status = new FakeElement();
+
+    // When: the ready state is rendered.
+    renderLibrary(
+      {
+        kind: "ready",
+        rows: [],
+        view: "all",
+        query: "",
+        selectedTagKeys: [],
+        selectedFolderId: "empty-folder",
+        catalog: [],
+        rowStates: {},
+        tagStates: {},
+      },
+      { document: new FakeDocument(), status, bookmarks: new FakeElement() },
+      vi.fn(),
+    );
+
+    // Then: the established filtered no-match message is shown.
+    expect(status.textContent).toBe("No bookmarks match your search and filters.");
+  });
 });

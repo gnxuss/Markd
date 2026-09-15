@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createLibraryController } from "../../src/library/controller.js";
 import { selectRows } from "../../src/library/selectors.js";
-import type { BookmarkRow, LibraryState } from "../../src/types.js";
+import type { BookmarkLibrarySnapshot, BookmarkRow, LibraryState } from "../../src/types.js";
 
 const design = { key: "design", label: "Design" } as const;
 const research = { key: "research", label: "RESEARCH" } as const;
@@ -98,5 +98,79 @@ describe("retrieval criteria reconciliation", () => {
       selectedTagKeys: [],
       rows: [{ id: "native-alpha" }, { id: "native-beta" }],
     });
+  });
+
+  it("keeps a selected native folder through rename and clears it after deletion", async () => {
+    // Given: a selected parent folder with direct, descendant, and sibling bookmarks.
+    const snapshots: BookmarkLibrarySnapshot[] = [{
+      folders: [{ id: "work", title: "Work", children: [{ id: "deep", title: "Deep", children: [] }] }, {
+        id: "personal", title: "Personal", children: [],
+      }],
+      rows: [
+        { ...rows[0], folderId: "work" },
+        { ...rows[1], folderId: "deep" },
+        { ...rows[2], folderId: "personal" },
+      ],
+    }, {
+      folders: [{ id: "work", title: "Renamed Work", children: [{ id: "deep", title: "Deep", children: [] }] }],
+      rows: [{ ...rows[0], folderId: "work" }, { ...rows[1], folderId: "deep" }],
+    }, {
+      folders: [{ id: "personal", title: "Personal", children: [] }],
+      rows: [{ ...rows[2], folderId: "personal" }],
+    }];
+    const observed: LibraryState[] = [];
+    const loadLibrary = vi.fn(async () => {
+      const snapshot = snapshots.shift();
+      if (snapshot === undefined) throw new TypeError("Native snapshot unavailable");
+      return snapshot;
+    });
+    const controller = createLibraryController({ loadLibrary, render: (state) => observed.push(state) });
+    await controller.bootstrap();
+
+    // When: the parent is selected, renamed on refresh, then deleted on refresh.
+    controller.selectFolder("work");
+    const selectedState = observed.at(-1);
+    await controller.refresh();
+    const renamedState = observed.at(-1);
+    await controller.refresh();
+
+    // Then: filtering includes descendants by ID and only deletion clears the criterion.
+    expect(selectedState).toMatchObject({
+      kind: "ready",
+      selectedFolderId: "work",
+      rows: [{ id: "native-alpha" }, { id: "native-beta" }],
+    });
+    expect(renamedState).toMatchObject({ kind: "ready", selectedFolderId: "work" });
+    expect(observed.at(-1)).toMatchObject({ kind: "ready", selectedFolderId: undefined });
+  });
+
+  it("composes folder selection with search and tag criteria without extra loads", async () => {
+    // Given: one loaded native snapshot and active search and tag criteria.
+    const loadLibrary = vi.fn(async (): Promise<BookmarkLibrarySnapshot> => ({
+      folders: [{ id: "work", title: "Work", children: [{ id: "deep", title: "Deep", children: [] }] }],
+      rows: [{ ...rows[0], folderId: "work" }, { ...rows[1], folderId: "deep" }, { ...rows[2], folderId: "elsewhere" }],
+    }));
+    const observed: LibraryState[] = [];
+    const controller = createLibraryController({
+      loadLibrary,
+      loadTags: async () => ({ "native-alpha": [design, research], "native-beta": [design] }),
+      render: (state) => observed.push(state),
+    });
+    await controller.bootstrap();
+
+    // When: folder, search, and tag filters are combined in memory.
+    controller.selectFolder("work");
+    controller.setSearch("alpha");
+    controller.toggleTagFilter("research");
+
+    // Then: all criteria remain active and the native tree is not read again.
+    expect(observed.at(-1)).toMatchObject({
+      kind: "ready",
+      selectedFolderId: "work",
+      query: "alpha",
+      selectedTagKeys: ["research"],
+      rows: [{ id: "native-alpha" }],
+    });
+    expect(loadLibrary).toHaveBeenCalledTimes(1);
   });
 });
