@@ -33,6 +33,11 @@ const rows = [
   },
 ] satisfies readonly BookmarkRow[];
 
+function withFolder(row: BookmarkRow | undefined, folderId: string): BookmarkRow {
+  if (row === undefined) throw new TypeError("Bookmark row fixture unavailable");
+  return { ...row, folderId };
+}
+
 describe("retrieval selection", () => {
   it("returns the current view unchanged in native order when criteria are empty", () => {
     expect(selectRows(rows, "all", { query: "", selectedTagKeys: [] })).toEqual(rows);
@@ -107,16 +112,16 @@ describe("retrieval criteria reconciliation", () => {
         id: "personal", title: "Personal", children: [],
       }],
       rows: [
-        { ...rows[0], folderId: "work" },
-        { ...rows[1], folderId: "deep" },
-        { ...rows[2], folderId: "personal" },
+        withFolder(rows[0], "work"),
+        withFolder(rows[1], "deep"),
+        withFolder(rows[2], "personal"),
       ],
     }, {
       folders: [{ id: "work", title: "Renamed Work", children: [{ id: "deep", title: "Deep", children: [] }] }],
-      rows: [{ ...rows[0], folderId: "work" }, { ...rows[1], folderId: "deep" }],
+      rows: [withFolder(rows[0], "work"), withFolder(rows[1], "deep")],
     }, {
       folders: [{ id: "personal", title: "Personal", children: [] }],
-      rows: [{ ...rows[2], folderId: "personal" }],
+      rows: [withFolder(rows[2], "personal")],
     }];
     const observed: LibraryState[] = [];
     const loadLibrary = vi.fn(async () => {
@@ -141,14 +146,15 @@ describe("retrieval criteria reconciliation", () => {
       rows: [{ id: "native-alpha" }, { id: "native-beta" }],
     });
     expect(renamedState).toMatchObject({ kind: "ready", selectedFolderId: "work" });
-    expect(observed.at(-1)).toMatchObject({ kind: "ready", selectedFolderId: undefined });
+    expect(observed.at(-1)).toMatchObject({ kind: "ready" });
+    expect(observed.at(-1)).not.toHaveProperty("selectedFolderId");
   });
 
   it("composes folder selection with search and tag criteria without extra loads", async () => {
     // Given: one loaded native snapshot and active search and tag criteria.
     const loadLibrary = vi.fn(async (): Promise<BookmarkLibrarySnapshot> => ({
       folders: [{ id: "work", title: "Work", children: [{ id: "deep", title: "Deep", children: [] }] }],
-      rows: [{ ...rows[0], folderId: "work" }, { ...rows[1], folderId: "deep" }, { ...rows[2], folderId: "elsewhere" }],
+      rows: [withFolder(rows[0], "work"), withFolder(rows[1], "deep"), withFolder(rows[2], "elsewhere")],
     }));
     const observed: LibraryState[] = [];
     const controller = createLibraryController({

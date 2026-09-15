@@ -50,7 +50,11 @@ export type RowTagState =
 
 export type LibraryState =
   | { readonly kind: "loading" }
-  | { readonly kind: "empty" }
+  | {
+      readonly kind: "empty";
+      readonly folders?: readonly NativeFolderNode[];
+      readonly selectedFolderId?: string;
+    }
   | {
       readonly kind: "ready";
       readonly rows: readonly BookmarkRow[];
@@ -60,5 +64,7 @@ export type LibraryState =
       readonly catalog: readonly TagRecord[];
       readonly rowStates: Readonly<Record<string, RowOpenState>>;
       readonly tagStates: Readonly<Record<string, RowTagState>>;
+      readonly folders?: readonly NativeFolderNode[];
+      readonly selectedFolderId?: string;
     }
   | { readonly kind: "error"; readonly message: string };

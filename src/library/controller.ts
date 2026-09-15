@@ -1,6 +1,6 @@
 import { openBookmark } from "../browser/open-tab.js";
-import { resolveTagInput } from "../tags/canonicalize.js";
 import type {
+  BookmarkLibrarySnapshot,
   BookmarkRow,
   LibraryState,
   RowOpenState,
@@ -10,9 +10,11 @@ import type {
   TagAssignments,
   TagRecord,
   LibraryView,
+  NativeFolderNode,
 } from "../types.js";
 import { confirmedTagCatalog, selectRows } from "./selectors.js";
 import { enrichBookmarkRow } from "./search-index.js";
+import { createRowTagMutations } from "./row-tag-mutations.js";
 
 export type BookmarkActivation = {
   readonly button: number;
@@ -22,8 +24,11 @@ export type BookmarkActivation = {
   readonly preventDefault: () => void;
 };
 
-type LibraryControllerDependencies = {
-  readonly loadRows: () => Promise<readonly BookmarkRow[]>;
+type LibrarySource =
+  | { readonly loadLibrary: () => Promise<BookmarkLibrarySnapshot> }
+  | { readonly loadRows: () => Promise<readonly BookmarkRow[]> };
+
+type LibraryControllerDependencies = LibrarySource & {
   readonly loadTags?: (bookmarkIds: readonly string[]) => Promise<TagAssignments>;
   readonly loadNotes?: (bookmarkIds: readonly string[]) => Promise<NoteAssignments>;
   readonly writeTags?: (bookmarkId: string, tags: readonly TagRecord[]) => Promise<void>;
@@ -41,6 +46,8 @@ export type LibraryController = {
   readonly selectView: (view: LibraryView) => void;
   readonly setSearch: (query: string) => void;
   readonly toggleTagFilter: (tagKey: string) => void;
+  readonly selectFolder: (folderId: string) => void;
+  readonly clearFolder: () => void;
   readonly updateNote: (bookmarkId: string, note: string) => void;
   readonly getRows: () => readonly BookmarkRow[];
   readonly commitTags: (updates: Readonly<Record<string, readonly TagRecord[]>>) => void;
@@ -54,23 +61,48 @@ export function createLibraryController(
   let tagStates: Readonly<Record<string, RowTagState>> = {};
   let view: LibraryView = "all";
   let criteria: RetrievalCriteria = { query: "", selectedTagKeys: [] };
+  let folders: readonly NativeFolderNode[] = [];
+  let selectedFolderId: string | undefined;
   const open = dependencies.open ?? openBookmark;
   const loadTags = dependencies.loadTags ?? (async (): Promise<TagAssignments> => ({}));
   const loadNotes = dependencies.loadNotes ?? (async (): Promise<NoteAssignments> => ({}));
   const writeTags = dependencies.writeTags ?? (async () => undefined);
   const schedule = dependencies.schedule ?? ((callback, duration) => window.setTimeout(callback, duration));
-  const tagWriteQueues = new Map<string, Promise<void>>();
+  const loadLibrary = "loadLibrary" in dependencies
+    ? dependencies.loadLibrary
+    : async (): Promise<BookmarkLibrarySnapshot> => ({ rows: await dependencies.loadRows(), folders: [] });
+
+  function selectedFolderIds(): ReadonlySet<string> | undefined {
+    if (selectedFolderId === undefined) return undefined;
+    const ids = new Set<string>();
+    const visit = (nodes: readonly NativeFolderNode[], collect: boolean): boolean => {
+      for (const folder of nodes) {
+        const matches = collect || folder.id === selectedFolderId;
+        if (matches) ids.add(folder.id);
+        if (visit(folder.children, matches) || folder.id === selectedFolderId) return true;
+      }
+      return false;
+    };
+    return visit(folders, false) ? ids : undefined;
+  }
 
   async function refresh(): Promise<void> {
     try {
-      const loadedRows = await dependencies.loadRows();
+      const snapshot = await loadLibrary();
+      folders = snapshot.folders;
+      if (selectedFolderId !== undefined && selectedFolderIds() === undefined) selectedFolderId = undefined;
+      const loadedRows = snapshot.rows;
       const ids = loadedRows.map((row) => row.id);
       const [assignments, notes] = await Promise.all([loadTags(ids), loadNotes(ids)]);
       const liveIds = new Set(loadedRows.map((row) => row.id));
       rows = loadedRows.map((row) => enrichBookmarkRow(row, assignments[row.id] ?? [], notes[row.id] ?? ""));
       rowStates = Object.fromEntries(Object.entries(rowStates).filter(([id]) => liveIds.has(id)));
       tagStates = Object.fromEntries(Object.entries(tagStates).filter(([id]) => liveIds.has(id)));
-      if (rows.length === 0) dependencies.render({ kind: "empty" });
+      if (rows.length === 0) dependencies.render({
+        kind: "empty",
+        folders,
+        ...(selectedFolderId === undefined ? {} : { selectedFolderId }),
+      });
       else renderReady();
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -90,100 +122,27 @@ export function createLibraryController(
     }
     dependencies.render({
       kind: "ready",
-      rows: selectRows(rows, view, criteria),
+      rows: selectRows(rows, view, criteria, selectedFolderIds()),
       view,
       query: criteria.query,
       selectedTagKeys: criteria.selectedTagKeys,
       catalog,
       rowStates,
       tagStates,
+      folders,
+      ...(selectedFolderId === undefined ? {} : { selectedFolderId }),
     });
     tagStates = Object.fromEntries(Object.entries(tagStates).map(([id, state]) => [id, { ...state, focus: false }]));
   }
 
-  async function performAddTag(bookmarkId: string, input: string): Promise<void> {
-    const row = rows.find((candidate) => candidate.id === bookmarkId);
-    if (row === undefined) return;
-    const resolution = resolveTagInput(input, rows.flatMap((candidate) => candidate.tags));
-    if (resolution.kind === "invalid") {
-      tagStates = {
-        ...tagStates,
-        [bookmarkId]: { kind: "error", input, focus: false, message: "Enter a tag name." },
-      };
-      renderReady();
-      return;
-    }
-    if (row.tags.some((candidate) => candidate.key === resolution.tag.key)) {
-      tagStates = { ...tagStates, [bookmarkId]: { kind: "idle", input: "", focus: true } };
-      renderReady();
-      return;
-    }
-    const nextTags = [...row.tags, resolution.tag];
-    tagStates = { ...tagStates, [bookmarkId]: { kind: "saving", input, focus: false } };
-    renderReady();
-    try {
-      await writeTags(bookmarkId, nextTags);
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        tagStates = {
-          ...tagStates,
-          [bookmarkId]: { kind: "error", input, focus: false, message: "Tag could not be saved." },
-        };
-        renderReady();
-        return;
-      }
-      tagStates = { ...tagStates, [bookmarkId]: { kind: "idle", input, focus: false } };
-      renderReady();
-      throw error;
-    }
-    rows = rows.map((candidate) => candidate.id === bookmarkId
-      ? enrichBookmarkRow(candidate, nextTags, candidate.note ?? "")
-      : candidate);
-    tagStates = { ...tagStates, [bookmarkId]: { kind: "idle", input: "", focus: true } };
-    renderReady();
-  }
-
-  async function performRemoveTag(bookmarkId: string, tagKey: string): Promise<void> {
-    const row = rows.find((candidate) => candidate.id === bookmarkId);
-    if (row === undefined || !row.tags.some((tag) => tag.key === tagKey)) return;
-    const input = tagStates[bookmarkId]?.input ?? "";
-    const nextTags = row.tags.filter((tag) => tag.key !== tagKey);
-    tagStates = { ...tagStates, [bookmarkId]: { kind: "saving", input, focus: false } };
-    renderReady();
-    try {
-      await writeTags(bookmarkId, nextTags);
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        tagStates = {
-          ...tagStates,
-          [bookmarkId]: { kind: "error", input, focus: false, message: "Tag could not be removed." },
-        };
-        renderReady();
-        return;
-      }
-      tagStates = { ...tagStates, [bookmarkId]: { kind: "idle", input, focus: false } };
-      renderReady();
-      throw error;
-    }
-    rows = rows.map((candidate) => candidate.id === bookmarkId
-      ? enrichBookmarkRow(candidate, nextTags, candidate.note ?? "")
-      : candidate);
-    tagStates = { ...tagStates, [bookmarkId]: { kind: "idle", input, focus: false } };
-    renderReady();
-  }
-
-  async function enqueueTagMutation(bookmarkId: string, operation: () => Promise<void>): Promise<void> {
-    const previous = tagWriteQueues.get(bookmarkId);
-    const current = previous === undefined
-      ? operation()
-      : previous.catch(() => undefined).then(operation);
-    tagWriteQueues.set(bookmarkId, current);
-    try {
-      await current;
-    } finally {
-      if (tagWriteQueues.get(bookmarkId) === current) tagWriteQueues.delete(bookmarkId);
-    }
-  }
+  const tagMutations = createRowTagMutations({
+    getRows: () => rows,
+    setRows: (nextRows) => { rows = nextRows; },
+    getStates: () => tagStates,
+    setStates: (nextStates) => { tagStates = nextStates; },
+    write: writeTags,
+    render: renderReady,
+  });
 
   return {
     bootstrap: async (): Promise<void> => {
@@ -191,12 +150,8 @@ export function createLibraryController(
       await refresh();
     },
     refresh,
-    addTag: async (bookmarkId, input): Promise<void> => {
-      await enqueueTagMutation(bookmarkId, () => performAddTag(bookmarkId, input));
-    },
-    removeTag: async (bookmarkId, tagKey): Promise<void> => {
-      await enqueueTagMutation(bookmarkId, () => performRemoveTag(bookmarkId, tagKey));
-    },
+    addTag: tagMutations.add,
+    removeTag: tagMutations.remove,
     selectView: (nextView): void => {
       view = nextView;
       if (rows.length > 0) renderReady();
@@ -212,6 +167,22 @@ export function createLibraryController(
         : [...criteria.selectedTagKeys, tagKey];
       criteria = { ...criteria, selectedTagKeys };
       if (rows.length > 0) renderReady();
+    },
+    selectFolder: (folderId): void => {
+      const previous = selectedFolderId;
+      selectedFolderId = folderId;
+      if (selectedFolderIds() === undefined) {
+        selectedFolderId = previous;
+        return;
+      }
+      if (rows.length > 0) renderReady();
+      else dependencies.render({ kind: "empty", folders, selectedFolderId });
+    },
+    clearFolder: (): void => {
+      if (selectedFolderId === undefined) return;
+      selectedFolderId = undefined;
+      if (rows.length > 0) renderReady();
+      else dependencies.render({ kind: "empty", folders });
     },
     updateNote: (bookmarkId, note): void => {
       rows = rows.map((row) => row.id === bookmarkId ? enrichBookmarkRow(row, row.tags, note) : row);

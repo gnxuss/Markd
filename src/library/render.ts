@@ -104,7 +104,9 @@ function renderLibraryPage(
             });
         elements.document.replaceChildren(elements.tagCatalog, catalogNodes);
       }
-      const hasActiveCriteria = state.query.trim().length > 0 || state.selectedTagKeys.length > 0;
+      const hasActiveCriteria = state.query.trim().length > 0
+        || state.selectedTagKeys.length > 0
+        || state.selectedFolderId !== undefined;
       const noMatches = hasActiveCriteria && state.rows.length === 0;
       const emptyUntagged = !hasActiveCriteria && state.view === "untagged" && state.rows.length === 0;
       elements.status.textContent = noMatches
@@ -192,7 +194,7 @@ export function createLibraryRenderer(
       renderLibraryPage(state, elements, activate, addTag, removeTag, toggleTagFilter, undefined, details, bulk);
       return;
     }
-    const nextSignature = `${state.view}\n${state.query}\n${state.selectedTagKeys.join("\n")}`;
+    const nextSignature = `${state.view}\n${state.query}\n${state.selectedTagKeys.join("\n")}\n${state.selectedFolderId ?? ""}`;
     if (nextSignature !== criteriaSignature) pageIndex = 0;
     criteriaSignature = nextSignature;
     const bounds = pageBounds(state.rows.length, pageIndex);
