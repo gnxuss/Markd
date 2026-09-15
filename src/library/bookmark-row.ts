@@ -188,7 +188,26 @@ export function createBookmarkRow(
     add: actions.addTag,
     remove: actions.removeTag,
   });
-  elements.document.append(item, [title, url, editor.tags, editor.form]);
+  const folderPath = (row.folderPath ?? "")
+    .split("/")
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0)
+    .join(" › ");
+  const folder = folderPath.length === 0
+    ? undefined
+    : elements.document.createElement("span");
+  if (folder !== undefined) {
+    folder.className = "bookmark-folder";
+    folder.textContent = folderPath;
+    elements.document.setAttribute(folder, "title", folderPath);
+  }
+  elements.document.append(item, [
+    title,
+    url,
+    editor.tags,
+    ...(folder === undefined ? [] : [folder]),
+    editor.form,
+  ]);
   if (details !== undefined) {
     const detailState = details.state(row.id);
     const expanded = detailState.kind !== "closed";

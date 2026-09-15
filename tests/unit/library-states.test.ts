@@ -116,6 +116,30 @@ describe("library state", () => {
       "example.com/reference",
     );
     expect(bookmarks.children[0]?.children[0]?.children[2]?.children).toEqual([]);
+    expect(bookmarks.children[0]?.children[0]?.children.some(
+      (child) => child.className === "bookmark-folder",
+    )).toBe(false);
+  });
+
+  it("renders native folder paths as safe breadcrumbs and omits blank paths", () => {
+    const documentPort = new FakeDocument();
+    const bookmarks = new FakeElement();
+    const state: LibraryState = {
+      kind: "ready", rows: [{ ...row, folderPath: " Favourites Bar / <Learn> " }],
+      view: "all", query: "", selectedTagKeys: [], catalog: [], rowStates: {}, tagStates: {},
+    };
+    const elements = { document: documentPort, status: new FakeElement(), bookmarks };
+    renderLibrary(state, elements, vi.fn());
+    const breadcrumb = bookmarks.children[0]?.children[0]?.children[3];
+    expect(breadcrumb?.className).toBe("bookmark-folder");
+    expect(breadcrumb?.textContent).toBe("Favourites Bar › <Learn>");
+    expect(breadcrumb?.attributes.get("title")).toBe("Favourites Bar › <Learn>");
+    expect(breadcrumb?.children).toEqual([]);
+
+    renderLibrary({ ...state, rows: [{ ...row, folderPath: " / " }] }, elements, vi.fn());
+    expect(bookmarks.children[0]?.children[0]?.children.some(
+      (child) => child.className === "bookmark-folder",
+    )).toBe(false);
   });
 
   it("uses an explicit fallback for a blank native title", () => {
