@@ -90,4 +90,95 @@ describe("bulk organization built Chromium", () => {
     await page.click(".selection-mode-toggle");
     expect(await page.$(`${row} .bookmark-selection`)).toBeNull();
   }, 30_000);
+
+  it("keeps left selection geometry and sticky bulk controls contained", async () => {
+    const nestedBookmarks = Array.from({ length: 36 }, (_, index) => ({
+      kind: "bookmark",
+      key: `nested-${index}`,
+      title: index === 0
+        ? "A deliberately long bookmark title for selection layout containment"
+        : `Nested bookmark ${index}`,
+      url: `https://nested.example/${index}/a-deliberately-long-url-segment`,
+    })) satisfies readonly SeedNode[];
+    fixture = await launchExtension([{
+      kind: "folder",
+      title: "Favourites Bar",
+      children: [{
+        kind: "folder",
+        title: "A very long learning folder name that must remain contained",
+        children: nestedBookmarks,
+      }],
+    }]);
+    const page = await fixture.openLibrary();
+    const normalLayout = await page.$eval("#bookmarks", (element) => ({
+      maxHeight: getComputedStyle(element).maxHeight,
+      overflowY: getComputedStyle(element).overflowY,
+      toolbarPosition: getComputedStyle(element.querySelector(".bulk-controls") ?? element).position,
+    }));
+    expect(normalLayout.toolbarPosition).not.toBe("sticky");
+    expect(normalLayout.overflowY).not.toBe("auto");
+    expect(normalLayout.maxHeight).toBe("none");
+
+    await page.click(".selection-mode-toggle");
+    const activeLayout = await page.$eval("#bookmarks", (element) => {
+      const checkboxElement = element.querySelector(".bookmark-selection input");
+      const titleElement = element.querySelector(".bookmark-title");
+      const toolbarElement = element.querySelector(".bulk-controls");
+      const breadcrumbElement = element.querySelector(".bookmark-folder");
+      if (!(checkboxElement instanceof HTMLElement)
+        || !(titleElement instanceof HTMLElement)
+        || !(toolbarElement instanceof HTMLElement)
+        || !(breadcrumbElement instanceof HTMLElement)) {
+        throw new TypeError("Selection layout was not rendered");
+      }
+      const checkbox = checkboxElement.getBoundingClientRect();
+      const title = titleElement.getBoundingClientRect();
+      const toolbar = toolbarElement.getBoundingClientRect();
+      const breadcrumb = breadcrumbElement.getBoundingClientRect();
+      return {
+        checkboxLeft: checkbox.left,
+        checkboxRight: checkbox.right,
+        checkboxMiddle: checkbox.top + checkbox.height / 2,
+        titleLeft: title.left,
+        titleMiddle: title.top + title.height / 2,
+        toolbarTop: toolbar.top,
+        toolbarPosition: getComputedStyle(toolbarElement).position,
+        overflowY: getComputedStyle(element).overflowY,
+        breadcrumbScrollWidth: breadcrumbElement.scrollWidth,
+        breadcrumbWidth: breadcrumb.width,
+      };
+    });
+    expect(activeLayout.checkboxLeft).toBeLessThan(activeLayout.titleLeft);
+    expect(activeLayout.titleLeft - activeLayout.checkboxRight).toBeGreaterThanOrEqual(16);
+    expect(activeLayout.titleLeft - activeLayout.checkboxRight).toBeLessThanOrEqual(24);
+    expect(Math.abs(activeLayout.checkboxMiddle - activeLayout.titleMiddle)).toBeLessThanOrEqual(3);
+    expect(activeLayout.toolbarPosition).toBe("sticky");
+    expect(activeLayout.overflowY).toBe("auto");
+    expect(activeLayout.breadcrumbScrollWidth).toBeGreaterThan(activeLayout.breadcrumbWidth);
+
+    const scrolledLayout = await page.$eval("#bookmarks", (element) => {
+      const toolbar = element.querySelector(".bulk-controls");
+      const row = element.querySelector(".bookmark-row");
+      if (!(toolbar instanceof HTMLElement) || !(row instanceof HTMLElement)) {
+        throw new TypeError("Scrollable selection layout was not rendered");
+      }
+      const before = { toolbarTop: toolbar.getBoundingClientRect().top, rowTop: row.getBoundingClientRect().top };
+      element.scrollTop = 240;
+      return new Promise<{ readonly toolbarTop: number; readonly rowTop: number }>((resolve) => {
+        requestAnimationFrame(() => resolve({
+          toolbarTop: toolbar.getBoundingClientRect().top,
+          rowTop: row.getBoundingClientRect().top,
+        }));
+      }).then((after) => ({ before, after }));
+    });
+    expect(Math.abs(scrolledLayout.after.toolbarTop - activeLayout.toolbarTop)).toBeLessThanOrEqual(2);
+    expect(scrolledLayout.after.rowTop).toBeLessThan(scrolledLayout.before.rowTop - 100);
+
+    await page.click(".selection-mode-toggle");
+    expect(await page.$eval("#bookmarks", (element) => ({
+      maxHeight: getComputedStyle(element).maxHeight,
+      overflowY: getComputedStyle(element).overflowY,
+      toolbarPosition: getComputedStyle(element.querySelector(".bulk-controls") ?? element).position,
+    }))).toEqual({ maxHeight: "none", overflowY: "visible", toolbarPosition: "static" });
+  }, 60_000);
 });

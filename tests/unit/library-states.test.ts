@@ -136,10 +136,12 @@ describe("library state", () => {
     expect(breadcrumb?.attributes.get("title")).toBe("Favourites Bar › <Learn>");
     expect(breadcrumb?.children).toEqual([]);
 
-    renderLibrary({ ...state, rows: [{ ...row, folderPath: " / " }] }, elements, vi.fn());
-    expect(bookmarks.children[0]?.children[0]?.children.some(
-      (child) => child.className === "bookmark-folder",
-    )).toBe(false);
+    for (const folderPath of [" / ", "Other Favourites"] as const) {
+      renderLibrary({ ...state, rows: [{ ...row, folderPath }] }, elements, vi.fn());
+      expect(bookmarks.children[0]?.children[0]?.children.some(
+        (child) => child.className === "bookmark-folder",
+      )).toBe(false);
+    }
   });
 
   it("uses an explicit fallback for a blank native title", () => {

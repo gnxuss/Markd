@@ -188,12 +188,12 @@ export function createBookmarkRow(
     add: actions.addTag,
     remove: actions.removeTag,
   });
-  const folderPath = (row.folderPath ?? "")
+  const folderSegments = (row.folderPath ?? "")
     .split("/")
     .map((segment) => segment.trim())
-    .filter((segment) => segment.length > 0)
-    .join(" › ");
-  const folder = folderPath.length === 0
+    .filter((segment) => segment.length > 0);
+  const folderPath = folderSegments.join(" › ");
+  const folder = folderSegments.length < 2
     ? undefined
     : elements.document.createElement("span");
   if (folder !== undefined) {
