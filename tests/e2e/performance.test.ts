@@ -1,26 +1,14 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { launchExtension, type ExtensionFixture, type SeedNode } from "./fixtures.js";
-
-const bookmarkCount = 2_000;
-const largeLibrary = [
-  ...Array.from({ length: bookmarkCount - 1 }, (_, index) => ({
-    kind: "bookmark" as const,
-    key: `bookmark-${index}`,
-    title: `Performance bookmark ${String(index).padStart(4, "0")}`,
-    url: `https://performance.example/bookmark/${index}`,
-  })),
-  { kind: "folder", title: "Deep archive", children: [
-    { kind: "folder", title: "Needle shelf", children: [
-      {
-        kind: "bookmark",
-        key: "bookmark-1999",
-        title: "Performance bookmark 1999",
-        url: "https://performance.example/bookmark/1999",
-      },
-    ] },
-  ] },
-] satisfies readonly SeedNode[];
+import { launchExtension, type ExtensionFixture } from "./fixtures.js";
+import {
+  BOOKMARK_COUNT,
+  LARGE_LIBRARY,
+  domCounts,
+  installReadCounters,
+  readCounts,
+  resetReadCounters,
+} from "./performance-support.js";
 
 let fixture: ExtensionFixture | undefined;
 
@@ -32,7 +20,7 @@ afterEach(async () => {
 describe("large-library built Chromium", () => {
   it("keeps the live bookmark DOM bounded while every result remains reachable", async () => {
     // Given: a disposable Chromium profile with 2,000 native bookmarks.
-    fixture = await launchExtension(largeLibrary, true);
+    fixture = await launchExtension(LARGE_LIBRARY, true);
     const lastId = fixture.bookmarks["bookmark-1999"]?.id;
     if (lastId === undefined) throw new TypeError("Off-page performance seed unavailable");
     await fixture.worker.evaluate(async (id) => chrome.storage.local.set({
@@ -44,27 +32,8 @@ describe("large-library built Chromium", () => {
     const cdp = await page.createCDPSession();
     await cdp.send("HeapProfiler.collectGarbage");
     const initialMetrics = await page.metrics();
-    const initialCounts = await page.evaluate(() => ({
-      rows: document.querySelectorAll(".bookmark-row").length,
-      elements: document.querySelectorAll("*").length,
-    }));
-    await page.evaluate(() => {
-      const root = document.documentElement;
-      root.dataset["bookmarkReads"] = "0";
-      root.dataset["storageReads"] = "0";
-      chrome.bookmarks.getTree = new Proxy(chrome.bookmarks.getTree, {
-        apply: (target, thisArgument, argumentsList) => {
-          root.dataset["bookmarkReads"] = String(Number(root.dataset["bookmarkReads"] ?? "0") + 1);
-          return Reflect.apply(target, thisArgument, argumentsList);
-        },
-      });
-      chrome.storage.local.get = new Proxy(chrome.storage.local.get, {
-        apply: (target, thisArgument, argumentsList) => {
-          root.dataset["storageReads"] = String(Number(root.dataset["storageReads"] ?? "0") + 1);
-          return Reflect.apply(target, thisArgument, argumentsList);
-        },
-      });
-    });
+    const initialCounts = await domCounts(page);
+    await installReadCounters(page);
     const collapsedFolders = await page.$$eval(
       ".folder-select",
       (buttons) => buttons.map((button) => button.textContent),
@@ -101,10 +70,7 @@ describe("large-library built Chromium", () => {
     await page.waitForSelector('[data-tag-key="archive scope"]');
     await page.click('[data-tag-key="archive scope"]');
     expect(await page.$(`[data-bookmark-id="${lastId}"]`)).not.toBeNull();
-    expect(await page.evaluate(() => ({
-      bookmarks: document.documentElement.dataset["bookmarkReads"],
-      storage: document.documentElement.dataset["storageReads"],
-    }))).toEqual({ bookmarks: "0", storage: "0" });
+    expect(await readCounts(page)).toEqual({ bookmarks: "0", storage: "0" });
     await page.click('[data-tag-key="archive scope"]');
     await page.click(".folder-clear");
     for (let cycle = 0; cycle < 5; cycle += 1) {
@@ -124,10 +90,7 @@ describe("large-library built Chromium", () => {
     await page.click("#bookmark-search", { count: 3 });
     await page.type("#bookmark-search", "needle shelf");
     expect(await page.$(`[data-bookmark-id="${lastId}"]`)).not.toBeNull();
-    expect(await page.evaluate(() => ({
-      bookmarks: document.documentElement.dataset["bookmarkReads"],
-      storage: document.documentElement.dataset["storageReads"],
-    }))).toEqual({ bookmarks: "0", storage: "0" });
+    expect(await readCounts(page)).toEqual({ bookmarks: "0", storage: "0" });
     await page.click("#bookmark-search", { count: 3 });
     await page.keyboard.press("Backspace");
     const firstId = fixture.bookmarks["bookmark-0"]?.id;
@@ -151,11 +114,7 @@ describe("large-library built Chromium", () => {
     }
     await page.click(`[data-bookmark-id="${lastId}"] .bookmark-selection input`);
     expect(await page.$eval(".selection-count", (element) => element.textContent)).toBe("2 selected");
-    const selectionCounts = await page.evaluate(() => ({
-      rows: document.querySelectorAll(".bookmark-row").length,
-      checkboxes: document.querySelectorAll(".bookmark-selection input").length,
-      elements: document.querySelectorAll("*").length,
-    }));
+    const selectionCounts = await domCounts(page);
     await page.type(".bulk-tag-input", "Bulk performance");
     await page.keyboard.press("Enter");
     await page.click(".bulk-add");
@@ -188,14 +147,53 @@ describe("large-library built Chromium", () => {
     await page.click(`${firstRow} .bookmark-link`, { button: "middle" });
     const openedPage = await (await openedTarget).page();
     await openedPage?.close();
+    const destinationId = await fixture.worker.evaluate(async () => {
+      const destination = (await chrome.bookmarks.search({ title: "Deep archive" }))[0];
+      if (destination === undefined) throw new TypeError("Performance destination unavailable");
+      return destination.id;
+    });
+    await page.click(".selection-mode-toggle");
+    await page.click(`${firstRow} .bookmark-selection input`);
+    for (let pageIndex = 1; pageIndex < 20; pageIndex += 1) {
+      await page.click(".pagination-button:last-child");
+    }
+    await page.click(`[data-bookmark-id="${lastId}"] .bookmark-selection input`);
+    const moveSelectionCounts = await domCounts(page);
+    await resetReadCounters(page);
+    await page.select(".bulk-move-folder", destinationId);
+    expect(await readCounts(page)).toEqual({ bookmarks: "0", storage: "0" });
+    await page.click(".bulk-move-submit");
+    await page.waitForFunction(async ({ ids, parentId }) => {
+      const nodes = await Promise.all(ids.map((id) => chrome.bookmarks.get(id)));
+      return nodes.every((entries) => entries[0]?.parentId === parentId);
+    }, {}, { ids: [firstId, lastId], parentId: destinationId });
+    await page.waitForFunction(() => document.querySelector(".selection-count")?.textContent === "0 selected");
+    await page.waitForFunction((id) => document.querySelector(`[data-bookmark-id="${id}"]`) !== null, {}, lastId);
+    await resetReadCounters(page);
+    await page.type("#bookmark-search", "Performance bookmark renamed");
+    expect(await page.$(`[data-bookmark-id="${firstId}"]`)).not.toBeNull();
+    await page.click("#bookmark-search", { count: 3 });
+    await page.keyboard.press("Backspace");
+    while (await page.$(`[data-folder-id="${destinationId}"]`) === null) {
+      const disclosure = await page.$('.folder-disclosure[aria-expanded="false"]');
+      if (disclosure === null) throw new TypeError("Performance destination was not rendered");
+      await disclosure.click();
+    }
+    await page.click(`[data-folder-id="${destinationId}"]`);
+    expect(await page.$(`[data-bookmark-id="${firstId}"]`)).not.toBeNull();
+    expect(await page.$(`[data-bookmark-id="${lastId}"]`)).not.toBeNull();
+    await page.click('[data-tag-key="bulk performance"]');
+    expect(await page.$(`[data-bookmark-id="${firstId}"]`)).not.toBeNull();
+    await page.click('[data-tag-key="bulk performance"]');
+    await page.click(".folder-clear");
+    await page.click(".pagination-button:last-child");
+    expect(await readCounts(page)).toEqual({ bookmarks: "0", storage: "0" });
+    await page.click(".selection-mode-toggle");
     await cdp.send("HeapProfiler.collectGarbage");
     const repeatedMetrics = await page.metrics();
-    const repeatedCounts = await page.evaluate(() => ({
-      rows: document.querySelectorAll(".bookmark-row").length,
-      elements: document.querySelectorAll("*").length,
-    }));
+    const repeatedCounts = await domCounts(page);
     console.info("MARKD_PERF_OPTIMIZED", JSON.stringify({
-      bookmarkCount,
+      bookmarkCount: BOOKMARK_COUNT,
       initial: {
         nodes: initialMetrics.Nodes,
         heapBytes: initialMetrics.JSHeapUsedSize,
@@ -207,6 +205,7 @@ describe("large-library built Chromium", () => {
         ...repeatedCounts,
       },
       selection: selectionCounts,
+      moveSelection: moveSelectionCounts,
       pageTargets: fixture.browser.targets().filter((target) => target.type() === "page").length,
     }));
 
@@ -217,6 +216,9 @@ describe("large-library built Chromium", () => {
     expect(selectionCounts.rows).toBeLessThanOrEqual(100);
     expect(selectionCounts.checkboxes).toBeLessThanOrEqual(100);
     expect(selectionCounts.elements).toBeLessThan(1_200);
+    expect(moveSelectionCounts.rows).toBeLessThanOrEqual(100);
+    expect(moveSelectionCounts.checkboxes).toBeLessThanOrEqual(100);
+    expect(moveSelectionCounts.elements).toBeLessThan(1_200);
     expect(lastPageFirstId).toBe(fixture.bookmarks["bookmark-1900"]?.id);
     const pageTarget = page.target();
     await page.close();

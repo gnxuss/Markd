@@ -14,13 +14,17 @@ async function typeScriptFiles(directory: string): Promise<readonly string[]> {
 }
 
 describe("native bookmark authority", () => {
-  it("keeps native bookmark mutation limited to Quick Save creation", async () => {
+  it("allows only Quick Save creation and explicit Library movement", async () => {
     const files = await typeScriptFiles("src");
     const sources = await Promise.all(files.map(async (file) => [file, await readFile(file, "utf8")] as const));
-    const forbidden = /chrome\.bookmarks\.(?:create|update|move|remove|removeTree)\s*\(/;
+    const mutations = sources.flatMap(([file, source]) => Array.from(
+      source.matchAll(/chrome\.bookmarks\.(create|update|move|remove|removeTree)\s*\(/g),
+      ([, method]) => ({ file, method }),
+    )).sort((left, right) => `${left.file}:${left.method}`.localeCompare(`${right.file}:${right.method}`));
 
-    expect(sources.filter(([, source]) => forbidden.test(source)).map(([file]) => file)).toEqual([
-      "src/quick-save/main.ts",
+    expect(mutations).toEqual([
+      { file: "src/library/main.ts", method: "move" },
+      { file: "src/quick-save/main.ts", method: "create" },
     ]);
   });
 

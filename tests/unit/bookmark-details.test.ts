@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createBookmarkDetails } from "../../src/library/bookmark-details.js";
+import { createBookmarkMoving } from "../../src/library/bookmark-moving.js";
 
 function deferred<T>(): {
   readonly promise: Promise<T>;
@@ -111,5 +112,40 @@ describe("bookmark details controller", () => {
     expect(controller.state("first")).toEqual({ kind: "closed" });
     controller.closeAll(["second"]);
     expect(controller.areAllOpen(["second"])).toBe(false);
+  });
+
+  it("retains a failed move destination and prevents overlapping retries", async () => {
+    // Given: open Details with a native move that fails once and then waits.
+    const pending = deferred<void>();
+    const nativeMove = vi.fn()
+      .mockRejectedValueOnce(new TypeError("native move unavailable"))
+      .mockImplementationOnce(() => pending.promise);
+    const controller = createBookmarkDetails({
+      load: async () => "Existing note",
+      write: vi.fn(),
+      onState: vi.fn(),
+      folders: () => [{ id: "destination", title: "Destination", children: [] }],
+      moving: createBookmarkMoving(nativeMove),
+    });
+    const row = { id: "native-id", title: "Target", url: "https://target.example", folderId: "source", tags: [] } as const;
+    await controller.toggle(row.id);
+    controller.setMoveDestination(row.id, "destination");
+
+    // When: the failed move is retried while another activation overlaps.
+    await controller.move(row);
+    expect(controller.moveState(row.id)).toMatchObject({ kind: "error", destinationId: "destination" });
+    const retry = controller.move(row);
+    await controller.move(row);
+    pending.resolve();
+    await retry;
+
+    // Then: one retry succeeds without losing the destination or note state.
+    expect(nativeMove).toHaveBeenCalledTimes(2);
+    expect(controller.moveState(row.id)).toEqual({
+      kind: "success",
+      destinationId: "destination",
+      message: "Bookmark moved.",
+    });
+    expect(controller.state(row.id)).toMatchObject({ kind: "ready", note: "Existing note" });
   });
 });
