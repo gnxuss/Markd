@@ -1,7 +1,11 @@
-import type { BookmarkRow } from "../types.js";
-import { flattenBookmarks } from "./flatten.js";
+import type { BookmarkLibrarySnapshot, BookmarkRow } from "../types.js";
+import { projectBookmarkLibrary } from "./flatten.js";
+
+export async function loadBookmarkLibrary(): Promise<BookmarkLibrarySnapshot> {
+  const tree = await chrome.bookmarks.getTree();
+  return projectBookmarkLibrary(tree);
+}
 
 export async function loadBookmarkRows(): Promise<readonly BookmarkRow[]> {
-  const tree = await chrome.bookmarks.getTree();
-  return flattenBookmarks(tree);
+  return (await loadBookmarkLibrary()).rows;
 }

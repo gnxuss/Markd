@@ -16,9 +16,21 @@ export type BookmarkRow = {
   readonly title: string;
   readonly url: string;
   readonly tags: readonly TagRecord[];
+  readonly folderId?: string;
   readonly folderPath?: string;
   readonly note?: string;
   readonly searchText?: string;
+};
+
+export type NativeFolderNode = {
+  readonly id: string;
+  readonly title: string;
+  readonly children: readonly NativeFolderNode[];
+};
+
+export type BookmarkLibrarySnapshot = {
+  readonly rows: readonly BookmarkRow[];
+  readonly folders: readonly NativeFolderNode[];
 };
 
 export type RowOpenState =

@@ -4,9 +4,11 @@ export function selectRows(
   rows: readonly BookmarkRow[],
   view: LibraryView,
   criteria: RetrievalCriteria = { query: "", selectedTagKeys: [] },
+  allowedFolderIds?: ReadonlySet<string>,
 ): readonly BookmarkRow[] {
   const query = criteria.query.trim().toLocaleLowerCase();
   return rows.filter((row) => {
+    if (allowedFolderIds !== undefined && (row.folderId === undefined || !allowedFolderIds.has(row.folderId))) return false;
     if (view === "untagged" && row.tags.length > 0) return false;
     const searchable = row.searchText
       ?? `${row.title}\n${row.url}\n${row.folderPath ?? ""}\n${row.tags.map((tag) => `${tag.label}\n${tag.key}`).join("\n")}\n${row.note ?? ""}`.toLocaleLowerCase();
