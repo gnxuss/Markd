@@ -16,7 +16,7 @@ const folders = [
 const rows = [
   { id: "one", title: "One", url: "https://duplicate.example/item", folderId: "work", tags: [] },
   { id: "two", title: "Two", url: "https://duplicate.example/item", folderId: "personal", tags: [] },
-  { id: "three", title: "Three", url: "https://three.example", folderId: "work", tags: [] },
+  { id: "three", title: "Three", url: "https://three.example", folderId: "nested", tags: [] },
 ] satisfies readonly BookmarkRow[];
 
 describe("bookmark moving", () => {
@@ -43,10 +43,12 @@ describe("bookmark moving", () => {
     // When: a forged destination and the current parent are requested.
     const stale = await moving.moveOne({ bookmarkId: "one", currentParentId: "work", destinationId: "missing", folders });
     const unchanged = await moving.moveOne({ bookmarkId: "one", currentParentId: "work", destinationId: "work", folders });
+    const bulkStale = await moving.moveMany(["one"], rows, "missing", folders);
 
     // Then: neither request reaches Chromium.
     expect(stale).toEqual({ kind: "invalid-destination", destinationId: "missing" });
     expect(unchanged).toEqual({ kind: "unchanged", bookmarkId: "one" });
+    expect(bulkStale).toEqual({ kind: "invalid-destination", destinationId: "missing" });
     expect(nativeMove).not.toHaveBeenCalled();
   });
 
@@ -69,17 +71,15 @@ describe("bookmark moving", () => {
     await vi.waitFor(() => expect(releases).toHaveLength(2));
     releases.shift()?.();
     releases.shift()?.();
-    await vi.waitFor(() => expect(releases).toHaveLength(1));
-    releases.shift()?.();
     const result = await pending;
 
     // Then: calls remain bounded and result groups preserve selection order.
     expect(maximumActive).toBe(2);
-    expect(nativeMove.mock.calls.map(([id]) => id)).toEqual(["one", "two", "three"]);
+    expect(nativeMove.mock.calls.map(([id]) => id)).toEqual(["one", "two"]);
     expect(result).toEqual({
       kind: "settled",
-      movedIds: ["one", "three"],
-      unchangedIds: [],
+      movedIds: ["one"],
+      unchangedIds: ["three"],
       failedIds: ["two"],
     });
   });

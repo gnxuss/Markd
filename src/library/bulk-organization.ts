@@ -1,4 +1,6 @@
 import type { BookmarkRow, TagRecord } from "../types.js";
+import type { NativeFolderNode } from "../types.js";
+import type { BookmarkMoving, FolderDestination } from "./bookmark-moving.js";
 
 export type BulkOperation = "add" | "remove";
 export type BulkStatus = "idle" | "saving" | "error" | "success";
@@ -9,6 +11,7 @@ export type BulkOrganizationState = {
   readonly stagedTags: readonly TagRecord[];
   readonly status: BulkStatus;
   readonly message: string;
+  readonly destinationId: string;
 };
 
 type BulkOrganizationDependencies = {
@@ -16,6 +19,8 @@ type BulkOrganizationDependencies = {
   readonly write: (bookmarkId: string, tags: readonly TagRecord[]) => Promise<void>;
   readonly commit: (updates: Readonly<Record<string, readonly TagRecord[]>>) => void;
   readonly onState: () => void;
+  readonly folders?: () => readonly NativeFolderNode[];
+  readonly moving?: BookmarkMoving;
 };
 
 export type BulkOrganization = {
@@ -28,6 +33,9 @@ export type BulkOrganization = {
   readonly stage: (tag: TagRecord) => void;
   readonly unstage: (tagKey: string) => void;
   readonly apply: (operation: BulkOperation) => Promise<void>;
+  readonly moveDestinations: () => readonly FolderDestination[];
+  readonly setDestination: (destinationId: string) => void;
+  readonly move: () => Promise<void>;
   readonly dispose: () => void;
 };
 
@@ -63,6 +71,7 @@ export function createBulkOrganization(
   let stagedTags: readonly TagRecord[] = [];
   let status: BulkStatus = "idle";
   let message = "";
+  let destinationId = "";
   let disposed = false;
 
   const publish = (): void => {
@@ -74,7 +83,7 @@ export function createBulkOrganization(
   };
 
   return {
-    state: () => ({ mode, selectedIds, stagedTags, status, message }),
+    state: () => ({ mode, selectedIds, stagedTags, status, message, destinationId }),
     enter: () => {
       mode = true;
       resetResult();
@@ -84,6 +93,7 @@ export function createBulkOrganization(
       mode = false;
       selectedIds = [];
       stagedTags = [];
+      destinationId = "";
       resetResult();
       publish();
     },
@@ -148,10 +158,57 @@ export function createBulkOrganization(
       if (failed.length === 0) stagedTags = [];
       publish();
     },
+    moveDestinations: () => dependencies.moving?.destinations(dependencies.folders?.() ?? []) ?? [],
+    setDestination: (nextDestinationId) => {
+      if (status === "saving") return;
+      destinationId = nextDestinationId;
+      resetResult();
+      publish();
+    },
+    move: async () => {
+      const moving = dependencies.moving;
+      if (moving === undefined || status === "saving" || selectedIds.length === 0 || destinationId.length === 0) return;
+      status = "saving";
+      message = "";
+      publish();
+      let result;
+      try {
+        result = await moving.moveMany(
+          selectedIds,
+          dependencies.rows(),
+          destinationId,
+          dependencies.folders?.() ?? [],
+        );
+      } catch (error: unknown) {
+        status = "error";
+        message = "Could not move bookmarks.";
+        publish();
+        throw error;
+      }
+      switch (result.kind) {
+        case "invalid-destination":
+          status = "error";
+          message = "That folder is no longer available.";
+          break;
+        case "settled":
+          selectedIds = result.failedIds;
+          status = result.failedIds.length === 0 ? "success" : "error";
+          message = result.failedIds.length > 0
+            ? `${result.failedIds.length} bookmark${result.failedIds.length === 1 ? "" : "s"} could not be moved.`
+            : result.movedIds.length === 0 ? "Bookmarks already in this folder." : "Bookmarks moved.";
+          break;
+        default: {
+          const exhaustiveResult: never = result;
+          return exhaustiveResult;
+        }
+      }
+      publish();
+    },
     dispose: () => {
       disposed = true;
       selectedIds = [];
       stagedTags = [];
+      destinationId = "";
     },
   };
 }

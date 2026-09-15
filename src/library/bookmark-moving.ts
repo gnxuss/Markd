@@ -18,11 +18,14 @@ export type MoveBookmarkResult =
   | { readonly kind: "failed"; readonly bookmarkId: string; readonly message: string }
   | { readonly kind: "invalid-destination"; readonly destinationId: string };
 
-export type MoveBookmarksResult = {
-  readonly movedIds: readonly string[];
-  readonly unchangedIds: readonly string[];
-  readonly failedIds: readonly string[];
-};
+export type MoveBookmarksResult =
+  | {
+      readonly kind: "settled";
+      readonly movedIds: readonly string[];
+      readonly unchangedIds: readonly string[];
+      readonly failedIds: readonly string[];
+    }
+  | { readonly kind: "invalid-destination"; readonly destinationId: string };
 
 export type BookmarkMoving = {
   readonly destinations: (folders: readonly NativeFolderNode[]) => readonly FolderDestination[];
@@ -80,6 +83,9 @@ export function createBookmarkMoving(
     destinations: folderDestinations,
     moveOne,
     moveMany: async (bookmarkIds, rows, destinationId, folders) => {
+      if (!folderDestinations(folders).some(({ id }) => id === destinationId)) {
+        return { kind: "invalid-destination", destinationId };
+      }
       const rowById = new Map(rows.map((row) => [row.id, row]));
       const requests = bookmarkIds.flatMap((bookmarkId) => {
         const row = rowById.get(bookmarkId);
@@ -97,12 +103,24 @@ export function createBookmarkMoving(
           const index = nextIndex;
           nextIndex += 1;
           const request = requests[index];
-          if (request !== undefined) results[index] = await moveOne(request);
+          if (request === undefined) continue;
+          if (request.currentParentId === destinationId) {
+            results[index] = { kind: "unchanged", bookmarkId: request.bookmarkId };
+            continue;
+          }
+          try {
+            await nativeMove(request.bookmarkId, destinationId);
+            results[index] = { kind: "moved", bookmarkId: request.bookmarkId };
+          } catch (error: unknown) {
+            if (!(error instanceof Error)) throw error;
+            results[index] = { kind: "failed", bookmarkId: request.bookmarkId, message: error.message };
+          }
         }
       };
       const workerCount = Math.min(Math.max(1, concurrency), requests.length);
       await Promise.all(Array.from({ length: workerCount }, worker));
       return {
+        kind: "settled",
         movedIds: results.flatMap((result) => result.kind === "moved" ? [result.bookmarkId] : []),
         unchangedIds: results.flatMap((result) => result.kind === "unchanged" ? [result.bookmarkId] : []),
         failedIds: results.flatMap((result) => result.kind === "failed" ? [result.bookmarkId] : []),

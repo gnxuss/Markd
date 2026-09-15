@@ -74,6 +74,9 @@ renderThemeToggle();
 let renderer: ReturnType<typeof createLibraryRenderer>;
 let folderNavigation: ReturnType<typeof createFolderNavigation>;
 let latestState: LibraryState = { kind: "loading" };
+const moving = createBookmarkMoving(async (bookmarkId, destinationId) => {
+  await chrome.bookmarks.move(bookmarkId, { parentId: destinationId });
+});
 const controller = createLibraryController({
   loadLibrary: loadBookmarkLibrary,
   loadTags: loadTagAssignments,
@@ -94,15 +97,17 @@ const details = createBookmarkDetails({
   folders: () => latestState.kind === "ready" || latestState.kind === "empty"
     ? latestState.folders ?? []
     : [],
-  moving: createBookmarkMoving(async (bookmarkId, destinationId) => {
-    await chrome.bookmarks.move(bookmarkId, { parentId: destinationId });
-  }),
+  moving,
 });
 const bulk = createBulkOrganization({
   rows: controller.getRows,
   write: writeBookmarkTags,
   commit: controller.commitTags,
   onState: () => renderer.render(latestState),
+  folders: () => latestState.kind === "ready" || latestState.kind === "empty"
+    ? latestState.folders ?? []
+    : [],
+  moving,
 });
 folderNavigation = createFolderNavigation({
   root: requiredElement("folder-navigation"),

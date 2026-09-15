@@ -65,10 +65,38 @@ export function createBulkControls(
   const add = actionButton("Add tags", "bulk-add", elements, () => { void bulk.apply("add"); }, inactive);
   const remove = actionButton("Remove tags", "bulk-remove", elements, () => { void bulk.apply("remove"); }, inactive || hasUnconfirmed);
   const clear = actionButton("Clear selection", "bulk-clear", elements, bulk.clear, state.status === "saving" || state.selectedIds.length === 0);
+  const moveLabel = elements.document.createElement("label");
+  moveLabel.className = "bulk-move-label";
+  moveLabel.textContent = "Move to";
+  const destination = elements.document.createElement("select");
+  destination.className = "bulk-tag-input bulk-move-folder";
+  elements.document.setAttribute(destination, "aria-label", "Move selected bookmarks to folder");
+  const placeholder = elements.document.createElement("option");
+  placeholder.textContent = "Choose folder";
+  elements.document.setAttribute(placeholder, "value", "");
+  elements.document.append(destination, [placeholder]);
+  for (const folder of bulk.moveDestinations()) {
+    const option = elements.document.createElement("option");
+    option.textContent = folder.label;
+    elements.document.setAttribute(option, "value", folder.id);
+    elements.document.append(destination, [option]);
+  }
+  elements.document.setValue?.(destination, state.destinationId);
+  if (state.status === "saving") elements.document.setAttribute(destination, "disabled", "");
+  elements.document.addEventListener(destination, "change", () => {
+    bulk.setDestination(elements.document.value?.(destination) ?? "");
+  });
+  const move = actionButton(
+    state.status === "saving" ? "Moving…" : "Move bookmarks",
+    "bulk-add bulk-move-submit",
+    elements,
+    () => { void bulk.move(); },
+    state.status === "saving" || state.selectedIds.length === 0 || state.destinationId.length === 0,
+  );
   const status = elements.document.createElement("span");
   status.className = state.status === "error" ? "bulk-status error" : "bulk-status";
   status.textContent = state.message;
   elements.document.setAttribute(status, "role", "status");
-  elements.document.append(controls, [count, form, chips, add, remove, clear, status]);
+  elements.document.append(controls, [count, form, chips, add, remove, moveLabel, destination, move, clear, status]);
   return controls;
 }
