@@ -1,4 +1,4 @@
-import { loadBookmarkRows } from "../bookmarks/chrome-bookmarks.js";
+import { loadBookmarkLibrary } from "../bookmarks/chrome-bookmarks.js";
 import { loadTagAssignments, writeBookmarkTags } from "../tags/chrome-tag-storage.js";
 import { loadBookmarkNote, loadBookmarkNotes, writeBookmarkNote } from "../quick-save/metadata-storage.js";
 import { subscribeBookmarkLifecycle } from "./bookmark-lifecycle.js";
@@ -6,6 +6,7 @@ import { createBookmarkDetails } from "./bookmark-details.js";
 import { createLibraryController } from "./controller.js";
 import { createLibraryRenderer } from "./render.js";
 import { createBulkOrganization } from "./bulk-organization.js";
+import { createFolderNavigation } from "./folder-navigation.js";
 import type { RenderElement } from "./render.js";
 import type { LibraryState } from "../types.js";
 import { nextTheme, persistTheme, readTheme, type Theme } from "../theme-preference.js";
@@ -70,9 +71,10 @@ themeToggle.addEventListener("click", () => {
 });
 renderThemeToggle();
 let renderer: ReturnType<typeof createLibraryRenderer>;
+let folderNavigation: ReturnType<typeof createFolderNavigation>;
 let latestState: LibraryState = { kind: "loading" };
 const controller = createLibraryController({
-  loadRows: loadBookmarkRows,
+  loadLibrary: loadBookmarkLibrary,
   loadTags: loadTagAssignments,
   loadNotes: loadBookmarkNotes,
   writeTags: writeBookmarkTags,
@@ -80,6 +82,7 @@ const controller = createLibraryController({
     latestState = state;
     if (state.kind === "ready") bulk.retain(controller.getRows().map((row) => row.id));
     renderer.render(state);
+    folderNavigation.render(state);
   },
 });
 const details = createBookmarkDetails({
@@ -93,6 +96,11 @@ const bulk = createBulkOrganization({
   write: writeBookmarkTags,
   commit: controller.commitTags,
   onState: () => renderer.render(latestState),
+});
+folderNavigation = createFolderNavigation({
+  root: requiredElement("folder-navigation"),
+  selectFolder: controller.selectFolder,
+  clearFolder: controller.clearFolder,
 });
 renderer = createLibraryRenderer(
   elements,
@@ -120,5 +128,6 @@ window.addEventListener("pagehide", () => {
   lifecycle.dispose();
   details.dispose();
   bulk.dispose();
+  folderNavigation.dispose();
   renderer.dispose();
 }, { once: true });

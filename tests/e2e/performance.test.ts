@@ -84,20 +84,28 @@ describe("large-library built Chromium", () => {
     });
     expect(await page.$(`[data-bookmark-id="${lastId}"]`)).not.toBeNull();
     expect(await page.$eval(".selected-folder", (element) => element.textContent)).toContain("Deep archive");
+    await page.evaluate(() => {
+      const disclosure = Array.from(document.querySelectorAll<HTMLButtonElement>(".folder-disclosure"))
+        .find((button) => button.getAttribute("aria-expanded") === "true");
+      disclosure?.click();
+    });
+    expect(await page.$$eval(".folder-select", (buttons) => buttons.map((button) => button.textContent)))
+      .not.toContain("Deep archive");
+    expect(await page.$eval(".selected-folder", (element) => element.textContent)).toContain("Deep archive");
     await page.type("#bookmark-search", "rare memory phrase");
     expect(await page.$(`[data-bookmark-id="${lastId}"]`)).not.toBeNull();
     await page.click("#bookmark-search", { count: 3 });
     await page.keyboard.press("Backspace");
-    await page.type(`[data-bookmark-id="${lastId}"] .tag-input`, "Folder performance");
+    await page.type(`[data-bookmark-id="${lastId}"] .tag-input`, "Archive scope");
     await page.keyboard.press("Enter");
-    await page.waitForSelector('[data-tag-key="folder performance"]');
-    await page.click('[data-tag-key="folder performance"]');
+    await page.waitForSelector('[data-tag-key="archive scope"]');
+    await page.click('[data-tag-key="archive scope"]');
     expect(await page.$(`[data-bookmark-id="${lastId}"]`)).not.toBeNull();
     expect(await page.evaluate(() => ({
       bookmarks: document.documentElement.dataset["bookmarkReads"],
       storage: document.documentElement.dataset["storageReads"],
     }))).toEqual({ bookmarks: "0", storage: "0" });
-    await page.click('[data-tag-key="folder performance"]');
+    await page.click('[data-tag-key="archive scope"]');
     await page.click(".folder-clear");
     for (let cycle = 0; cycle < 5; cycle += 1) {
       await page.type("#bookmark-search", "missing");

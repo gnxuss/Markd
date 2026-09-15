@@ -51,6 +51,23 @@ button:not(:disabled):active { transform: scale(0.98); }
 .view-control { width: 100%; min-height: 2.1rem; padding: 0.42rem 0.65rem; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: #56606d; font-weight: 650; text-align: left; cursor: pointer; }
 .view-control:hover { background: #eceff3; color: #1c2430; }
 .view-control.active { border-color: #d6defd; background: var(--accent-soft); color: var(--accent-strong); box-shadow: inset 3px 0 0 var(--accent); }
+.folder-catalog-section, .tag-catalog-section { margin-top: 1.25rem; padding-top: 0.85rem; border-top: 1px solid var(--border); }
+.folder-catalog-section summary { display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.42rem; color: var(--text-subtle); font-size: 0.69rem; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; cursor: pointer; }
+.folder-catalog-section summary::marker { color: var(--text-subtle); }
+#folder-navigation { max-height: 15rem; overflow: auto; scrollbar-width: thin; }
+.folder-tree, .folder-node > ul { margin: 0; padding: 0; list-style: none; }
+.folder-row { display: grid; grid-template-columns: 1.45rem minmax(0, 1fr); align-items: center; padding-left: calc(var(--folder-depth) * 0.72rem); }
+.folder-disclosure, .folder-select, .selected-folder { border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: #56606d; cursor: pointer; }
+.folder-disclosure { display: grid; width: 1.35rem; height: 1.65rem; padding: 0; place-items: center; color: var(--text-subtle); font-size: 1rem; line-height: 1; }
+.folder-disclosure[aria-expanded="true"] { transform: rotate(90deg); }
+.folder-disclosure-spacer { width: 1.35rem; }
+.folder-select { overflow: hidden; min-height: 1.72rem; padding: 0.25rem 0.38rem; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.folder-disclosure:hover, .folder-select:hover { background: #eceff3; color: #1c2430; }
+.folder-select.active { background: var(--accent-soft); color: var(--accent-strong); font-weight: 650; }
+.selected-folder { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.3rem; width: 100%; margin-bottom: 0.35rem; padding: 0.34rem 0.42rem; border-color: var(--accent-border); background: var(--accent-soft); color: var(--accent-strong); font-size: 0.72rem; font-weight: 650; text-align: left; }
+.selected-folder span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.selected-folder-clear { font-size: 1rem; line-height: 0.8; }
+.folder-empty { margin: 0; color: var(--text-subtle); font-size: 0.79rem; }
 .tag-catalog-section { margin-top: 1.55rem; padding-top: 1rem; border-top: 1px solid var(--border); }
 .tag-catalog-section h2 { margin: 0 0 0.5rem; color: var(--text-subtle); font-size: 0.69rem; letter-spacing: 0.13em; text-transform: uppercase; }
 #tag-catalog { display: grid; gap: 0.12rem; }
@@ -115,7 +132,7 @@ button:not(:disabled):active { transform: scale(0.98); }
 .bookmark-pagination { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 0.7rem; padding: 0.32rem 0; }
 .pagination-button:disabled { cursor: default; opacity: 0.48; }
 .bookmark-range { color: var(--text-muted); font-size: 0.78rem; }
-.catalog-tag:focus-visible, .view-control:focus-visible, .theme-toggle:focus-visible, #bookmark-search:focus-visible, .bookmark-link:focus-visible, .tag-input:focus-visible, .tag-submit:focus-visible, .tag-remove:focus-visible, .tag-suggestion:focus-visible, .pagination-button:focus-visible, .details-toggle:focus-visible, .all-details-toggle:focus-visible, .bookmark-note:focus-visible, .note-save:focus-visible, .note-retry:focus-visible, .selection-mode-toggle:focus-visible, .bulk-tag-input:focus-visible, .bulk-stage:focus-visible, .bulk-add:focus-visible, .bulk-remove:focus-visible, .bulk-clear:focus-visible, .bulk-tag-chip:focus-visible, .bookmark-selection input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.catalog-tag:focus-visible, .view-control:focus-visible, .theme-toggle:focus-visible, .folder-catalog-section summary:focus-visible, .folder-disclosure:focus-visible, .folder-select:focus-visible, .selected-folder:focus-visible, #bookmark-search:focus-visible, .bookmark-link:focus-visible, .tag-input:focus-visible, .tag-submit:focus-visible, .tag-remove:focus-visible, .tag-suggestion:focus-visible, .pagination-button:focus-visible, .details-toggle:focus-visible, .all-details-toggle:focus-visible, .bookmark-note:focus-visible, .note-save:focus-visible, .note-retry:focus-visible, .selection-mode-toggle:focus-visible, .bulk-tag-input:focus-visible, .bulk-stage:focus-visible, .bulk-add:focus-visible, .bulk-remove:focus-visible, .bulk-clear:focus-visible, .bulk-tag-chip:focus-visible, .bookmark-selection input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 [aria-busy="true"] { opacity: 0.62; }
 button:disabled { cursor: not-allowed; opacity: 0.52; transform: none; }
 .bookmark-error, .tag-error { grid-column: 1 / -1; color: #b02a37; font-size: 0.76rem; }
@@ -129,6 +146,11 @@ button:disabled { cursor: not-allowed; opacity: 0.52; transform: none; }
 [data-theme="dark"] .theme-toggle:hover,
 [data-theme="dark"] .view-control:hover,
 [data-theme="dark"] .catalog-tag:hover { background: #202936; color: #eef2f7; }
+[data-theme="dark"] .folder-disclosure,
+[data-theme="dark"] .folder-select { color: #aeb7c3; }
+[data-theme="dark"] .folder-disclosure:hover,
+[data-theme="dark"] .folder-select:hover { background: #202936; color: #eef2f7; }
+[data-theme="dark"] .folder-select.active { color: #b8c6ff; }
 [data-theme="dark"] .view-control.active { border-color: #344a80; color: #b8c6ff; }
 [data-theme="dark"] .search-control label,
 [data-theme="dark"] .bookmark-details label { color: #bdc5cf; }
@@ -162,6 +184,8 @@ button:disabled { cursor: not-allowed; opacity: 0.52; transform: none; }
   .sidebar { position: static; }
   .view-navigation { grid-template-columns: 1fr 1fr; }
   .tag-catalog-section { margin-top: 0.8rem; padding-top: 0.8rem; }
+  .folder-catalog-section { margin-top: 0.8rem; padding-top: 0.8rem; }
+  #folder-navigation { max-height: 10rem; }
   #tag-catalog { display: flex; overflow-x: auto; }
   .catalog-tag { flex: 0 1 auto; min-width: max-content; }
   .bookmark-row { grid-template: "title title" auto "url url" auto "tags tags" auto "editor editor" auto / minmax(0, 1fr) auto; }
