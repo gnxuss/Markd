@@ -46,7 +46,10 @@ function appendNoteEditor(
   panel.className = "bookmark-details";
   elements.document.setAttribute(panel, "id", `bookmark-details-${row.id}`);
   elements.document.setAttribute(panel, "aria-label", `Note for ${row.title || "Untitled bookmark"}`);
-  elements.document.setAttribute(panel, "aria-busy", String(state.kind === "loading" || state.kind === "saving"));
+  const moveState = details.moveState(row.id);
+  elements.document.setAttribute(panel, "aria-busy", String(
+    state.kind === "loading" || state.kind === "saving" || moveState.kind === "moving",
+  ));
   if (state.kind === "loading") {
     panel.textContent = "Loading note…";
     elements.document.setAttribute(panel, "role", "status");
@@ -96,7 +99,46 @@ function appendNoteEditor(
     event.stopPropagation();
     void details.save(row.id);
   });
-  elements.document.append(panel, [status, label, textarea, save]);
+  const moveLabel = elements.document.createElement("label");
+  moveLabel.textContent = "Move to folder";
+  elements.document.setAttribute(moveLabel, "for", `bookmark-move-${row.id}`);
+  const destination = elements.document.createElement("select");
+  destination.className = "bookmark-move-folder bulk-tag-input";
+  elements.document.setAttribute(destination, "id", `bookmark-move-${row.id}`);
+  elements.document.setAttribute(destination, "aria-label", "Move to folder");
+  const placeholder = elements.document.createElement("option");
+  placeholder.textContent = "Choose folder";
+  elements.document.setAttribute(placeholder, "value", "");
+  elements.document.append(destination, [placeholder]);
+  for (const folder of details.moveDestinations()) {
+    const option = elements.document.createElement("option");
+    option.textContent = folder.label;
+    elements.document.setAttribute(option, "value", folder.id);
+    if (folder.id === row.folderId) elements.document.setAttribute(option, "disabled", "");
+    elements.document.append(destination, [option]);
+  }
+  elements.document.setValue?.(destination, moveState.destinationId);
+  if (moveState.kind === "moving") elements.document.setAttribute(destination, "disabled", "");
+  elements.document.addEventListener(destination, "change", () => {
+    details.setMoveDestination(row.id, elements.document.value?.(destination) ?? "");
+  });
+  const move = elements.document.createElement("button");
+  move.className = "bookmark-move-submit note-save";
+  move.textContent = moveState.kind === "moving" ? "Moving…" : "Move bookmark";
+  elements.document.setAttribute(move, "type", "button");
+  if (moveState.kind === "moving" || moveState.destinationId.length === 0) {
+    elements.document.setAttribute(move, "disabled", "");
+  }
+  elements.document.addEventListener(move, "click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void details.move(row);
+  });
+  const moveStatus = elements.document.createElement("p");
+  moveStatus.className = moveState.kind === "error" ? "note-status error" : "note-status";
+  moveStatus.textContent = moveState.message;
+  elements.document.setAttribute(moveStatus, "role", "status");
+  elements.document.append(panel, [status, label, textarea, save, moveLabel, destination, move, moveStatus]);
   elements.document.append(item, [panel]);
 }
 

@@ -7,6 +7,7 @@ import { createLibraryController } from "./controller.js";
 import { createLibraryRenderer } from "./render.js";
 import { createBulkOrganization } from "./bulk-organization.js";
 import { createFolderNavigation } from "./folder-navigation.js";
+import { createBookmarkMoving } from "./bookmark-moving.js";
 import type { RenderElement } from "./render.js";
 import type { LibraryState } from "../types.js";
 import { nextTheme, persistTheme, readTheme, type Theme } from "../theme-preference.js";
@@ -41,9 +42,9 @@ const elements = {
     setAttribute: (element: RenderElement, name: string, value: string) => {
       if (element instanceof HTMLElement) element.setAttribute(name, value);
     },
-    value: (element: RenderElement) => element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement ? element.value : "",
+    value: (element: RenderElement) => element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement ? element.value : "",
     setValue: (element: RenderElement, value: string) => {
-      if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) element.value = value;
+      if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement) element.value = value;
     },
     focus: (element: RenderElement) => {
       if (element instanceof HTMLElement) queueMicrotask(() => element.focus());
@@ -90,6 +91,12 @@ const details = createBookmarkDetails({
   write: writeBookmarkNote,
   onState: () => renderer.render(latestState),
   onSaved: controller.updateNote,
+  folders: () => latestState.kind === "ready" || latestState.kind === "empty"
+    ? latestState.folders ?? []
+    : [],
+  moving: createBookmarkMoving(async (bookmarkId, destinationId) => {
+    await chrome.bookmarks.move(bookmarkId, { parentId: destinationId });
+  }),
 });
 const bulk = createBulkOrganization({
   rows: controller.getRows,

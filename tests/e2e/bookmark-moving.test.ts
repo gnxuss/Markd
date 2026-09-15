@@ -85,6 +85,11 @@ describe("native bookmark moving built Chromium", () => {
     expect(await page.$eval('[data-tag-key="move"]', (element) => element.getAttribute("aria-pressed"))).toBe("true");
     await page.click(".folder-clear");
     expect(await page.$(row)).not.toBeNull();
+    while (await page.$(`[data-folder-id="${folderIds.destination}"]`) === null) {
+      const disclosure = await page.$('.folder-disclosure[aria-expanded="false"]');
+      if (disclosure === null) throw new TypeError("Destination folder was not rendered");
+      await disclosure.click();
+    }
     await page.click(`[data-folder-id="${folderIds.destination}"]`);
     expect(await page.$(row)).not.toBeNull();
     const stored = await fixture.worker.evaluate(async (id) => chrome.storage.local.get([
