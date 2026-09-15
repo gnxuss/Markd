@@ -65,6 +65,40 @@ describe("large-library built Chromium", () => {
         },
       });
     });
+    const collapsedFolders = await page.$$eval(
+      ".folder-select",
+      (buttons) => buttons.map((button) => button.textContent),
+    );
+    expect(collapsedFolders).not.toContain("Deep archive");
+    await page.evaluate(() => {
+      const disclosure = Array.from(document.querySelectorAll<HTMLButtonElement>(".folder-disclosure"))
+        .find((button) => button.getAttribute("aria-expanded") === "false");
+      disclosure?.click();
+    });
+    await page.waitForFunction(() => Array.from(document.querySelectorAll(".folder-select"))
+      .some((button) => button.textContent === "Deep archive"));
+    await page.evaluate(() => {
+      const folder = Array.from(document.querySelectorAll<HTMLButtonElement>(".folder-select"))
+        .find((button) => button.textContent === "Deep archive");
+      folder?.click();
+    });
+    expect(await page.$(`[data-bookmark-id="${lastId}"]`)).not.toBeNull();
+    expect(await page.$eval(".selected-folder", (element) => element.textContent)).toContain("Deep archive");
+    await page.type("#bookmark-search", "rare memory phrase");
+    expect(await page.$(`[data-bookmark-id="${lastId}"]`)).not.toBeNull();
+    await page.click("#bookmark-search", { count: 3 });
+    await page.keyboard.press("Backspace");
+    await page.type(`[data-bookmark-id="${lastId}"] .tag-input`, "Folder performance");
+    await page.keyboard.press("Enter");
+    await page.waitForSelector('[data-tag-key="folder performance"]');
+    await page.click('[data-tag-key="folder performance"]');
+    expect(await page.$(`[data-bookmark-id="${lastId}"]`)).not.toBeNull();
+    expect(await page.evaluate(() => ({
+      bookmarks: document.documentElement.dataset["bookmarkReads"],
+      storage: document.documentElement.dataset["storageReads"],
+    }))).toEqual({ bookmarks: "0", storage: "0" });
+    await page.click('[data-tag-key="folder performance"]');
+    await page.click(".folder-clear");
     for (let cycle = 0; cycle < 5; cycle += 1) {
       await page.type("#bookmark-search", "missing");
       await page.click("#bookmark-search", { count: 3 });
